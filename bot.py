@@ -3,7 +3,7 @@ import random
 import json
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -14,11 +14,7 @@ dp = Dispatcher()
 def get_main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🐉 Увійти в 3D Лігво", web_app=WebAppInfo(url=WEBAPP_URL))
-        ],
-        [
-            InlineKeyboardButton(text="💣 Гра «Бомба»", callback_data="play_bomb"),
-            InlineKeyboardButton(text="🎬 «Вгадай фільм»", callback_data="play_movie")
+            InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=WEBAPP_URL))
         ],
         [
             InlineKeyboardButton(text="🎰 Крутити !рулетка", callback_data="play_roulette"),
@@ -26,6 +22,37 @@ def get_main_keyboard():
         ]
     ])
 
+def is_text_trigger(text: str, triggers: list) -> bool:
+    if not text:
+        return False
+    clean = text.lower().strip()
+    clean = clean.split('@')[0].strip()
+    no_punct = clean.lstrip('!/').strip()
+    compact = clean.replace(' ', '')
+    for trig in triggers:
+        t_clean = trig.lower().lstrip('!/').strip()
+        t_compact = trig.lower().replace(' ', '')
+        if clean == trig.lower() or no_punct == t_clean or compact == t_compact:
+            return True
+    return False
+
+async def setup_bot_commands(bot: Bot):
+    commands = [
+        BotCommand(command="start", description="Головне меню та інвентар"),
+        BotCommand(command="lair", description="Відкрити Лігво Дракона"),
+        BotCommand(command="startdragon", description="Увійти в Лігво"),
+        BotCommand(command="profile", description="Профіль та рівні драконів"),
+        BotCommand(command="profildragon", description="Особистий профіль"),
+        BotCommand(command="roulette", description="🎰 Рулетка драконячих яєць"),
+        BotCommand(command="bomb", description="💣 Гра «Бомба»"),
+        BotCommand(command="movie", description="🎬 Гра «Вгадай фільм»"),
+    ]
+    try:
+        await bot.set_my_commands(commands)
+    except Exception as e:
+        print("Could not set bot commands:", e)
+
+@dp.message(Command("start", "startdragon", "dragonstart"))
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
@@ -57,15 +84,27 @@ async def cmd_start(message: types.Message):
 
     if not unlocked:
         welcome_text += (
-            "🥚 **Ваше 3D-лігво ще порожнє!**\n"
-            "У вас ще немає жодного дракона. Відкрийте або знайдіть свого першого дракона, щоб увійти до лігва!"
+            "🥚 **Ваше Лігво ще порожнє!**\n"
+            "У вас ще немає жодного дракона. Відкрийте або знайдіть свого першого дракона, щоб увійти до лігва!\n\n"
         )
     else:
-        welcome_text += "🎮 Натискайте **🐉 Увійти в 3D Лігво**, щоб тренувати та милуватися своїм драконом!"
+        welcome_text += "🎮 Натискайте **🐉 Увійти в Лігво**, щоб тренувати та милуватися своїм драконом!\n\n"
+
+    welcome_text += (
+        "🎮 **Швидкі команди:**\n"
+        "• `/bomb` або `!бомба` — Гра «Бомба» (шанс на монети, смаколики та яйце!)\n"
+        "• `/movie` або `!фільм` — Гра «Вгадай фільм»\n"
+        "• `/roulette` або `!рулетка` — Крутити рулетку яєць\n"
+        "• `/lair` або `!моєлігво` — Відкрити Лігво Дракона\n"
+        "• `/profile` або `/profildragon` — Профіль та рівні ваших драконів"
+    )
 
     await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-@dp.message(F.text.lower().in_({"!моє лігво", "моє лігво", "!лігво", "лігво", "/lair"}))
+LAIR_TRIGGERS = ["!моєлігво", "!моє лігво", "моєлігво", "моє лігво", "!лігво", "лігво", "!lair", "lair"]
+
+@dp.message(Command("lair", "startdragon", "dragon", "дракон", "лігво", "моєлігво"))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, LAIR_TRIGGERS)))
 async def cmd_lair(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
     unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
@@ -74,70 +113,83 @@ async def cmd_lair(message: types.Message):
         await message.answer(
             "🏰 **Ваше Лігво ще спить і порожнє!** 🥚\n\n"
             "У вас ще немає жодного дракона чи магічного яйця.\n"
-            "Знайдіть або відкрийте свого першого дракона, щоб зайти до 3D-лігва!",
+            "Зіграйте в `/bomb` або `/movie`, вибийте яйце та запустіть `!рулетка`!",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard()
         )
         return
 
     await message.answer(
-        "🏰 **Вхід до вашого 3D-гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити 3D-світ:",
+        "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити світ драконів:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🐉 Відкрити 3D Лігво Дракона", web_app=WebAppInfo(url=WEBAPP_URL))]
+            [InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=WEBAPP_URL))]
         ])
     )
 
-@dp.message(F.text.lower().in_({"!рулетка", "рулетка", "/roulette"}))
+ROULETTE_TRIGGERS = ["!рулетка", "рулетка", "!рулеька", "рулеька", "!roulette", "roulette"]
+
+@dp.message(Command("roulette", "roulettedragon", "рулетка"))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, ROULETTE_TRIGGERS)))
 async def cmd_roulette(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
     if user['eggs'] < 1:
         await message.answer(
-            "🥚 **У вас немає яєць для рулетки!** (Баланс: 0 🥚)\n\n"
-            "🎮 Грайте в чат-ігри **Гра «Бомба»** або **«Вгадай фільм»**, щоб здобути яйце дракона з шансом **10%**!",
+            "❌ **У вас немає яєць для рулетки!** (Потрібно 1 🥚)\n\n"
+            "💡 **Як отримати яйце:**\n"
+            "• Грайте в `/bomb` або `/movie` (10% шанс вибити драконяче яйце)!\n"
+            "• Отримуйте нагороди за активність у чаті.",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard()
         )
         return
 
-    # Deduct 1 egg
     await update_user(user['user_id'], eggs=user['eggs'] - 1)
 
     elements = ['fire', 'storm', 'frost', 'jade']
     elem_names = {
-        'fire': "🔥 Вогняне яйце (Тифумеранг)",
-        'storm': "⚡ Штормове яйце (Флайтмейр)",
-        'frost': "❄️ Крижане яйце (Дрімдракон)",
-        'jade': "🎋 Нефритове яйце (Синґтейл)"
+        'fire': "🔥 Вогняного Дракона (Typhoomerang)",
+        'storm': "⚡ Штормового Дракона (Flightmare)",
+        'frost': "❄️ Крижаного Дракона (Dreamdragon)",
+        'jade': "🎋 Нефритового Дракона (Singetail)"
     }
+
     won_elem = random.choice(elements)
     unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
+    levels = json.loads(user['dragon_levels']) if user.get('dragon_levels') else {}
 
-    if won_elem in unlocked:
-        # Duplicate compensation: +5 Food
+    is_duplicate = won_elem in unlocked
+
+    if is_duplicate:
         await update_user(user['user_id'], food=user['food'] + 5)
         text = (
-            f"🎰 **РУЛЕТКА СТИХІЙ:**\n\n"
-            f"Вам випало яйце стихії: **{elem_names[won_elem]}**!\n"
-            f"Оскільки ця стихія у вас вже є, яйце перетворено на поживу для дракона:\n"
-            f"🍖 **+5 смаколиків додано до вашого запасу!**"
+            f"🎰 **Рулетка прокручена!** (-1 🥚)\n\n"
+            f"✨ Випала стихія: **{elem_names[won_elem]}**!\n"
+            f"ℹ️ У вас вже є цей дракон. Компенсація: **+5 🍖 смаколиків**!"
         )
     else:
         unlocked.append(won_elem)
-        active_el = user.get('active_element')
-        if not active_el:
-            active_el = won_elem
-        await update_user(user['user_id'], unlocked_elements=unlocked, active_element=active_el)
+        if not user.get('active_element'):
+            await update_user(user['user_id'], active_element=won_elem)
+        if won_elem not in levels:
+            levels[won_elem] = 1
+        await update_user(
+            user['user_id'],
+            unlocked_elements=json.dumps(unlocked),
+            dragon_levels=json.dumps(levels)
+        )
         text = (
-            f"🎉 **НЕЙМОВІРНО! РУЛЕТКА РОЗБИЛА ШКАРАЛУПУ!**\n\n"
-            f"Ви щойно розблокували нове магічне яйце:\n"
-            f"✨ **{elem_names[won_elem]}** ✨\n\n"
-            f"🏰 **Тепер двері 3D-лігва відчинено!**\n"
-            f"Заходьте через кнопку **🐉 Увійти в 3D Лігво**, щоб наректи свого нового дракона та почати його вирощувати!"
+            f"🎰 **РУЛЕТКА ПРОКРУЧЕНА!** (-1 🥚)\n\n"
+            f"🎉 **НЕЙМОВІРНО! ВИ ВІДКРИЛИ НОВОГО ДРАКОНА!**\n"
+            f"🐉 Стихія: **{elem_names[won_elem]}**\n\n"
+            f"Тепер він доступний у вашому лігві! Перейдіть у меню та познайомтеся зі своїм новим улюбленцем."
         )
 
     await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-@dp.message(F.text.lower().in_({"!бомба", "бомба", "/bomb"}))
+BOMB_TRIGGERS = ["!бомба", "бомба", "!гра бомба", "гра бомба", "!bomb", "bomb"]
+
+@dp.message(Command("bomb", "bombgame", "bombdragon", "бомба", "гра_бомба"))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, BOMB_TRIGGERS)))
 async def cmd_bomb(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
     coins = random.randint(15, 20)
@@ -150,11 +202,14 @@ async def cmd_bomb(message: types.Message):
     if food > 0:
         msg += "\n🍖 **+1 смаколик** (випав з 20% шансом)!"
     if egg > 0:
-        msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `!рулетка`, щоб відкрити дракона!"
+        msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `/roulette` або `!рулетка`, щоб відкрити дракона!"
 
     await message.answer(msg, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-@dp.message(F.text.lower().in_({"!фільм", "вгадай фільм", "фільм", "/movie"}))
+MOVIE_TRIGGERS = ["!фільм", "фільм", "!вгадай фільм", "вгадай фільм", "!movie", "movie"]
+
+@dp.message(Command("movie", "moviegame", "moviedragon", "фільм", "вгадай_фільм"))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, MOVIE_TRIGGERS)))
 async def cmd_movie(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
     coins = random.randint(15, 20)
@@ -167,11 +222,14 @@ async def cmd_movie(message: types.Message):
     if food > 0:
         msg += "\n🍖 **+1 смаколик** (випав з 20% шансом)!"
     if egg > 0:
-        msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `!рулетка`, щоб відкрити дракона!"
+        msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `/roulette` або `!рулетка`, щоб відкрити дракона!"
 
     await message.answer(msg, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-@dp.message(F.text.lower().in_({"!профіль", "профіль", "/profile"}))
+PROFILE_TRIGGERS = ["!профіль", "профіль", "!профиль", "профиль", "!profildragon", "!profile", "profildragon", "profile"]
+
+@dp.message(Command("profile", "profildragon", "profiledragon", "dragonprofile", "профіль", "профиль"))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, PROFILE_TRIGGERS)))
 async def cmd_profile(message: types.Message):
     user = await get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.first_name or "")
     unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
@@ -216,7 +274,7 @@ async def cmd_reset(message: types.Message):
     await message.answer(
         "🔄 **Ваш профіль повністю скинуто до нуля!**\n"
         "У вас тепер 0 монет, 0 яєць, 0 драконів — стан чистого нового гравця.\n"
-        "Спробуйте надіслати `/start` або `!моє лігво`.",
+        "Спробуйте надіслати `/start` або `!моєлігво`.",
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )

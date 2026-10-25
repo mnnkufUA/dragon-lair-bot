@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from aiogram import Bot
-from bot import dp, BOT_TOKEN, WEBAPP_URL
+from bot import dp, BOT_TOKEN, WEBAPP_URL, setup_bot_commands
 from database import init_db, get_or_create_user, update_user, reset_user
 
 bot = None
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
     bot_task = None
     if BOT_TOKEN:
         bot = Bot(token=BOT_TOKEN)
+        await setup_bot_commands(bot)
         bot_task = asyncio.create_task(dp.start_polling(bot))
         print("🚀 Telegram Bot polling started successfully!")
     else:

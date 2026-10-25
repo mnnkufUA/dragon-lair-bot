@@ -2,6 +2,7 @@
 <html lang="uk" class="dark">
 <head>
   <meta charset="UTF-8">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Dragon Tamagotchi Full Animated 3D Mini App</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
@@ -8629,25 +8630,25 @@
         <span id="elementNameBadge" class="text-xs font-bold text-amber-400">🔥 Сонячне Полум'я (Typhoomerang)</span>
       </div>
       <div class="grid grid-cols-4 gap-2">
-        <button onclick="setElement('fire')" id="btn-fire" class="element-btn border-2 border-amber-500 bg-amber-950/40 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 shadow-lg shadow-amber-950/50">
+        <button onclick="setElement('fire')" id="btn-fire" class="element-btn border border-slate-800 bg-slate-900/60 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100">
           <span class="text-lg">🔥</span>
           <span class="text-[11px] font-bold mt-1 text-amber-200">Вогонь</span>
-          <span class="text-[9px] text-amber-400/80">3D готовий</span>
+          <span class="text-[9px] text-amber-400/80">🔒 Закрито</span>
         </button>
         <button onclick="setElement('storm')" id="btn-storm" class="element-btn border border-slate-800 bg-slate-900/60 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100">
           <span class="text-lg">⚡</span>
           <span class="text-[11px] font-bold mt-1 text-purple-200">Гроза</span>
-          <span class="text-[9px] text-purple-400/80">3D готовий</span>
+          <span class="text-[9px] text-purple-400/80">🔒 Закрито</span>
         </button>
         <button onclick="setElement('frost')" id="btn-frost" class="element-btn border border-slate-800 bg-slate-900/60 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100">
           <span class="text-lg">❄️</span>
           <span class="text-[11px] font-bold mt-1 text-cyan-200">Лід</span>
-          <span class="text-[9px] text-cyan-400/80">3D готовий</span>
+          <span class="text-[9px] text-cyan-400/80">🔒 Закрито</span>
         </button>
         <button onclick="setElement('jade')" id="btn-jade" class="element-btn border border-slate-800 bg-slate-900/60 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100">
           <span class="text-lg">🌿</span>
           <span class="text-[11px] font-bold mt-1 text-emerald-200">Смарагд</span>
-          <span class="text-[9px] text-emerald-400/80">3D готовий</span>
+          <span class="text-[9px] text-emerald-400/80">🔒 Закрито</span>
         </button>
       </div>
     </div>
@@ -8772,57 +8773,7 @@
 
 
     <!-- STORM ANIMATION TESTER / PREVIEWER (ONLY SHOWN FOR STORM DRAGON) -->
-    <div id="stormAnimInspector" class="bg-[#15122b] border border-purple-500/60 rounded-2xl p-4 shadow-xl space-y-3" style="display: none;">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-base">⚡</span>
-          <div>
-            <h4 class="text-xs font-extrabold text-purple-200">Тест / Перегляд анімацій Flightmare</h4>
-            <p class="text-[10px] text-purple-400 font-medium">8 оригінальних анімацій з FBX моделі</p>
-          </div>
-        </div>
-        <span class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/40">Очікує вказівок</span>
-      </div>
-
-      <p class="text-[11px] text-slate-300 leading-snug">
-        Натискай будь-яку кнопку нижче, щоб подивитися рух дракона у 3D, і напиши в чат, яку анімацію куди призначити:
-      </p>
-
-      <div class="grid grid-cols-2 gap-2 text-xs">
-        <button onclick="previewStormAnim('Birth')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">🐣 Birth (3.30с)</div>
-          <div class="text-[9px] text-purple-300/70">Вилуплення / підйом</div>
-        </button>
-        <button onclick="previewStormAnim('Eat')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">🍖 Eat (2.77с)</div>
-          <div class="text-[9px] text-purple-300/70">Жування / смакування їжі</div>
-        </button>
-        <button onclick="previewStormAnim('Interactive')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">🐾 Interactive (3.03с)</div>
-          <div class="text-[9px] text-purple-300/70">Грайливий рух при тапі</div>
-        </button>
-        <button onclick="previewStormAnim('move')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">🗺️ move (1.50с)</div>
-          <div class="text-[9px] text-purple-300/70">Крок / похід вперед</div>
-        </button>
-        <button onclick="previewStormAnim('Sleep_01')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">🌙 Sleep_01 (2.00с)</div>
-          <div class="text-[9px] text-purple-300/70">Вкладання / спокійний сон</div>
-        </button>
-        <button onclick="previewStormAnim('Sleep_02')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">💤 Sleep_02 (2.03с)</div>
-          <div class="text-[9px] text-purple-300/70">Поворухнувся уві сні</div>
-        </button>
-        <button onclick="previewStormAnim('Stand_01')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">✨ Stand_01 (1.70с)</div>
-          <div class="text-[9px] text-purple-300/70">Спокійне дихання (Idle 1)</div>
-        </button>
-        <button onclick="previewStormAnim('Stand_02')" class="bg-purple-950/50 hover:bg-purple-900/60 border border-purple-500/40 text-purple-200 p-2 rounded-xl text-left transition-all active:scale-95">
-          <div class="font-bold">⚡ Stand_02 (3.10с)</div>
-          <div class="text-[9px] text-purple-300/70">Бойова стійка / огляд</div>
-        </button>
-      </div>
-    </div>
+    div>
 
       <!-- Developer / Admin Footer Trigger -->
     <footer class="pt-6 pb-4 text-center">
@@ -10139,21 +10090,28 @@
       }
     }
 
-    let renderer;
+    let renderer = null;
     try {
-      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
-    } catch (e) {
-      console.warn("Falling back to standard WebGL renderer:", e);
-      renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'default' });
+    } catch (e1) {
+      console.warn("Falling back to standard WebGL renderer:", e1);
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+      } catch (e2) {
+        console.error("WebGL initialization failed:", e2);
+      }
     }
-    const initW = container.clientWidth || 382;
-    const initH = container.clientHeight || 320;
-    renderer.setSize(initW, initH);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    if (renderer) {
+      const initW = (container && container.clientWidth) ? container.clientWidth : 382;
+      const initH = (container && container.clientHeight) ? container.clientHeight : 320;
+      renderer.setSize(initW, initH);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -13305,11 +13263,7 @@
       document.getElementById('elementNameBadge').innerText = cfg.name;
       document.getElementById('statBuff').innerText = cfg.buff;
 
-      // Show Storm animations test inspector only when Storm is selected
-      const stormInspector = document.getElementById('stormAnimInspector');
-      if (stormInspector) {
-        stormInspector.style.display = (elem === 'storm') ? 'block' : 'none';
-      }
+// Storm animations inspector removed from normal player flow
 
       applyDragonNameUI();
       updateStageVisual();
