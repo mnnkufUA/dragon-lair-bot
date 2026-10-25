@@ -12,14 +12,14 @@ def _init_db_sync():
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
                 first_name TEXT,
-                coins INTEGER DEFAULT 150,
-                food INTEGER DEFAULT 5,
-                eggs INTEGER DEFAULT 1,
-                tears INTEGER DEFAULT 15,
-                active_element TEXT DEFAULT 'fire',
-                unlocked_elements TEXT DEFAULT '["fire"]',
+                coins INTEGER DEFAULT 0,
+                food INTEGER DEFAULT 0,
+                eggs INTEGER DEFAULT 0,
+                tears INTEGER DEFAULT 0,
+                active_element TEXT DEFAULT '',
+                unlocked_elements TEXT DEFAULT '[]',
                 dragon_names TEXT DEFAULT '{"fire":"Вогонько","storm":"Блискавка","frost":"Крижинка","jade":"Смарагд"}',
-                named_dragons TEXT DEFAULT '{"fire":true,"storm":false,"frost":false,"jade":false}',
+                named_dragons TEXT DEFAULT '{"fire":false,"storm":false,"frost":false,"jade":false}',
                 dragon_levels TEXT DEFAULT '{"fire":1,"storm":1,"frost":1,"jade":1}',
                 dragon_xp TEXT DEFAULT '{"fire":0,"storm":0,"frost":0,"jade":0}',
                 last_train INTEGER DEFAULT 0,
@@ -41,9 +41,9 @@ def _get_or_create_user_sync(user_id: int, username: str = "", first_name: str =
         if row:
             return dict(row)
 
-        default_unlocked = json.dumps(["fire"])
+        default_unlocked = json.dumps([])
         default_names = json.dumps({"fire": "Вогонько", "storm": "Блискавка", "frost": "Крижинка", "jade": "Смарагд"}, ensure_ascii=False)
-        default_named = json.dumps({"fire": True, "storm": False, "frost": False, "jade": False})
+        default_named = json.dumps({"fire": False, "storm": False, "frost": False, "jade": False})
         default_levels = json.dumps({"fire": 1, "storm": 1, "frost": 1, "jade": 1})
         default_xp = json.dumps({"fire": 0, "storm": 0, "frost": 0, "jade": 0})
 
@@ -52,7 +52,7 @@ def _get_or_create_user_sync(user_id: int, username: str = "", first_name: str =
                 user_id, username, first_name, coins, food, eggs, tears,
                 active_element, unlocked_elements, dragon_names, named_dragons,
                 dragon_levels, dragon_xp, last_train, last_expedition
-            ) VALUES (?, ?, ?, 150, 5, 1, 15, 'fire', ?, ?, ?, ?, ?, 0, 0)
+            ) VALUES (?, ?, ?, 0, 0, 0, 0, '', ?, ?, ?, ?, ?, 0, 0)
         """, (user_id, username, first_name, default_unlocked, default_names, default_named, default_levels, default_xp))
         conn.commit()
 
@@ -83,6 +83,32 @@ def _update_user_sync(user_id: int, kwargs: dict):
 
 async def update_user(user_id: int, **kwargs):
     await asyncio.to_thread(_update_user_sync, user_id, kwargs)
+
+def _reset_user_sync(user_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        default_unlocked = json.dumps([])
+        default_named = json.dumps({"fire": False, "storm": False, "frost": False, "jade": False})
+        default_levels = json.dumps({"fire": 1, "storm": 1, "frost": 1, "jade": 1})
+        default_xp = json.dumps({"fire": 0, "storm": 0, "frost": 0, "jade": 0})
+        conn.execute("""
+            UPDATE users SET
+                coins = 0,
+                food = 0,
+                eggs = 0,
+                tears = 0,
+                active_element = '',
+                unlocked_elements = ?,
+                named_dragons = ?,
+                dragon_levels = ?,
+                dragon_xp = ?,
+                last_train = 0,
+                last_expedition = 0
+            WHERE user_id = ?
+        """, (default_unlocked, default_named, default_levels, default_xp, user_id))
+        conn.commit()
+
+async def reset_user(user_id: int):
+    await asyncio.to_thread(_reset_user_sync, user_id)
 
 def _add_game_rewards_sync(user_id: int, coins: int, food: int, eggs: int):
     with sqlite3.connect(DB_PATH) as conn:

@@ -8589,132 +8589,38 @@
         <span class="text-base" id="headerAvatar">🥚</span>
       </div>
       <div>
-        <h1 class="font-extrabold text-sm leading-tight text-white flex items-center gap-1.5 tracking-tight">
+        <h1 class="font-extrabold text-base leading-tight text-white tracking-tight">
           Лігво Дракона
-          <span class="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/30">Унікальні 3D моделі</span>
         </h1>
-        <p class="text-[11px] text-slate-400 font-medium">Окрема реальна 3D модель під кожну стихію</p>
       </div>
     </div>
     
-    <div class="flex items-center gap-2">
-      <!-- Night / Day Lighting Toggle -->
-      <button onclick="toggle360Env()" id="env360ToggleBtn" class="flex items-center gap-1.5 bg-amber-950/80 border border-amber-600/70 px-2.5 py-1.5 rounded-full shadow-inner hover:border-amber-400 transition-colors text-[11px] font-bold text-amber-200" title="Перемкнути 360° Замок">
-        <span id="env360BtnIcon">👑</span> <span id="env360BtnText">360° Замок: Увімк</span>
-      </button>
-
-      <button onclick="toggleNightSimulation()" id="nightToggleBtn" class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-2.5 py-1.5 rounded-full shadow-inner hover:border-amber-400 transition-colors text-[11px] font-bold text-slate-300" title="Перемкнути денне / нічне освітлення">
-        <span id="nightBtnIcon">☀️</span> <span id="nightBtnText">День</span>
-      </button>
-
-      <!-- CURRENCIES & FOOD DISPLAY (Монети 🪙 & Сльози Дракона 💧) -->
-      <div class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-2.5 py-1 rounded-full shadow-inner" title="Монети 🪙 (Ігрова валюта за перемоги в іграх)">
+    <div class="flex items-center gap-1.5">
+      <!-- CURRENCIES & INVENTORY DISPLAY (0 BY DEFAULT) -->
+      <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Монети 🪙">
         <span class="text-xs">🪙</span>
-        <span id="sparksBalanceDisplay" class="text-xs font-bold text-amber-300 font-mono tracking-wide">150</span>
+        <span id="sparksBalanceDisplay" class="text-xs font-bold text-amber-300 font-mono tracking-wide">0</span>
       </div>
 
-      <div class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-2.5 py-1 rounded-full shadow-inner" title="Сльози Дракона 💧 (Донатна / Преміум валюта)">
+      <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Сльози Дракона 💧">
         <span class="text-xs">💧</span>
-        <span id="tearsBalanceDisplay" class="text-xs font-bold text-cyan-300 font-mono tracking-wide">15</span>
+        <span id="tearsBalanceDisplay" class="text-xs font-bold text-cyan-300 font-mono tracking-wide">0</span>
       </div>
 
-      <div class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-2.5 py-1 rounded-full shadow-inner" title="Смаколики 🍖 (Їжа з чат-ігор)">
+      <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Смаколики 🍖">
         <span class="text-xs">🍖</span>
-        <span id="foodBalanceDisplay" class="text-xs font-bold text-emerald-300 font-mono tracking-wide">5</span>
+        <span id="foodBalanceDisplay" class="text-xs font-bold text-emerald-300 font-mono tracking-wide">0</span>
       </div>
 
-      <div class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-2.5 py-1 rounded-full shadow-inner" title="Яйця Дракона 🥚 (для !рулетка)">
+      <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Яйця Дракона 🥚">
         <span class="text-xs">🥚</span>
-        <span id="eggBalanceDisplay" class="text-xs font-bold text-purple-300 font-mono tracking-wide">1</span>
+        <span id="eggBalanceDisplay" class="text-xs font-bold text-purple-300 font-mono tracking-wide">0</span>
       </div>
     </div>
   </header>
 
   <!-- MAIN APP CONTAINER -->
   <main class="max-w-md mx-auto p-4 space-y-4">
-
-    <!-- CHAT-BOT & USER FLOW SIMULATOR -->
-    <div class="bg-gradient-to-br from-[#12182b] to-[#0d1220] border border-indigo-500/40 rounded-2xl p-3.5 shadow-xl space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-lg">💬</span>
-          <div>
-            <h3 class="text-xs font-black text-indigo-200 uppercase tracking-wider flex items-center gap-1.5">
-              Симулятор Чат-бота Telegram
-              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">User Flow</span>
-            </h3>
-            <p class="text-[10px] text-slate-400">Перевірте випадання яєць, дроп смаколиків, !рулетку та команду !моє лігво</p>
-          </div>
-        </div>
-        <button onclick="toggleBotSimulator()" id="simToggleBtn" class="text-[11px] text-indigo-300 hover:text-white px-2 py-1 rounded bg-indigo-950/50 border border-indigo-700/40 transition-colors">
-          Згорнути ▲
-        </button>
-      </div>
-
-      <div id="simContent" class="space-y-2.5">
-        <!-- Chat games drop simulator -->
-        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
-          <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center justify-between">
-            <span>🎮 Ігри в чаті (Випадковий дроп 🍖, 🪙 та 🥚):</span>
-            <span class="text-emerald-400 font-mono text-[10px]">Дроп есенції</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="simulateGameWin('bomb')" class="bg-gradient-to-r from-red-950/60 to-rose-900/40 hover:from-red-900/70 hover:to-rose-800/60 border border-red-500/40 p-2 rounded-xl text-left transition-all active:scale-95 group">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-rose-200 flex items-center gap-1">💣 Гра «Бомба»</span>
-                <span class="text-xs">💥</span>
-              </div>
-              <p class="text-[10px] text-slate-300 mt-1">+15..20 🪙 | 20% 🍖 | 10% 🥚</p>
-            </button>
-
-            <button onclick="simulateGameWin('movie')" class="bg-gradient-to-r from-amber-950/60 to-yellow-900/40 hover:from-amber-900/70 hover:to-yellow-800/60 border border-amber-500/40 p-2 rounded-xl text-left transition-all active:scale-95 group">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-amber-200 flex items-center gap-1">🎬 «Вгадай фільм»</span>
-                <span class="text-xs">🏆</span>
-              </div>
-              <p class="text-[10px] text-slate-300 mt-1">+15..20 🪙 | 20% 🍖 | 10% 🥚</p>
-            </button>
-          </div>
-        </div>
-
-        <!-- Bot Commands simulator: !рулетка, !моє лігво -->
-        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
-          <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center justify-between">
-            <span>⚡ Чат-команди:</span>
-            <span class="text-purple-300 font-mono text-[10px]">Команди через «!»</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="openRouletteModal()" class="bg-gradient-to-r from-purple-950/60 to-indigo-900/50 hover:from-purple-900/70 hover:to-indigo-800/60 border border-purple-500/40 p-2 rounded-xl text-left transition-all active:scale-95">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-purple-200 flex items-center gap-1">🎰 !рулетка</span>
-                <span id="rouletteEggBadge" class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-900/80 text-purple-300 font-bold border border-purple-500/40">1 🥚</span>
-              </div>
-              <p class="text-[10px] text-purple-300/80 mt-1">4 яйця (повтор: +5 🍖)</p>
-            </button>
-
-            <button onclick="simulateLairCommand()" class="bg-gradient-to-r from-emerald-950/60 to-teal-900/50 hover:from-emerald-900/70 hover:to-teal-800/60 border border-emerald-500/40 p-2 rounded-xl text-left transition-all active:scale-95">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-emerald-200 flex items-center gap-1">🐉 !моє лігво</span>
-                <span class="text-xs">🏰</span>
-              </div>
-              <p class="text-[10px] text-emerald-300/80 mt-1">Вхід до WebApp гнізда</p>
-            </button>
-          </div>
-        </div>
-
-        <!-- Testing helpers bar -->
-        <div class="flex items-center justify-between pt-1 text-[11px]">
-          <button onclick="resetActionCooldowns()" class="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-950/50 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-transform active:scale-95">
-            <span>⚡ Скинути таймери (1г / 3г)</span>
-          </button>
-          <div class="flex items-center gap-1">
-            <button onclick="quickAddCurrency('sparks', 50)" class="text-[10px] font-bold text-amber-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-amber-400">+50 🪙</button>
-            <button onclick="quickAddCurrency('tears', 15)" class="text-[10px] font-bold text-cyan-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-cyan-400">+15 💧</button>
-            <button onclick="quickAddCurrency('food', 5)" class="text-[10px] font-bold text-emerald-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-emerald-400">+5 🍖</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- ELEMENT PICKER (UNIQUE MODEL FOR EACH) -->
     <div class="bg-[#101628]/95 border border-slate-800/80 rounded-2xl p-3 shadow-xl backdrop-blur-sm">
@@ -8769,6 +8675,27 @@
       <!-- Real Three.js Canvas Container -->
       <div class="relative w-full h-[320px] flex items-center justify-center">
         <canvas id="webglCanvas" class="w-full h-full block outline-none select-none"></canvas>
+
+        <!-- EMPTY LAIR OVERLAY (When 0 dragons unlocked) -->
+        <div id="emptyLairOverlay" class="absolute inset-0 z-30 bg-[#0a0d16]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4" style="display: none;">
+          <div class="relative">
+            <div class="w-20 h-20 rounded-full bg-slate-900/90 border-2 border-dashed border-amber-500/40 flex items-center justify-center shadow-2xl shadow-amber-500/10">
+              <span class="text-3xl opacity-60">🥚</span>
+            </div>
+            <span class="absolute -top-1 -right-2 text-[10px] bg-slate-800 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full font-bold">🔒 Спить</span>
+          </div>
+
+          <div class="space-y-2 max-w-xs">
+            <h3 class="text-base font-black text-white tracking-wide">Ваше Лігво ще порожнє</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Тут панує тиша... У вас ще немає жодного дракона чи магічного яйця.
+            </p>
+          </div>
+
+          <button onclick="handleEmptyLairClose()" class="w-full max-w-xs py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-rose-600 to-amber-700 hover:from-amber-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-xl shadow-rose-900/30 transition-transform active:scale-95 flex items-center justify-center gap-1.5">
+            <span>💬</span> Повернутися до Telegram
+          </button>
+        </div>
         
         <!-- 3D Loading Indicator -->
         <div id="loaderBox" class="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none transition-opacity duration-300" style="display: none; opacity: 0;">
@@ -8779,101 +8706,11 @@
 
       </div>
 
-      <!-- Interactive 3D Control Hints & Active Animation Indicator -->
-      <div class="relative z-20 w-full flex items-center justify-between gap-2 mt-1 pointer-events-none">
-        <p class="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5 bg-slate-950/80 px-3 py-1.5 rounded-full border border-slate-800 shadow">
-          <span>🎬</span> Анімація: <span id="currentAnimName" class="text-amber-300 font-bold">Очікування (Stand_01)</span>
-        </p>
-
-        <span id="moodTag" class="text-[11px] font-bold text-amber-400 bg-amber-950/40 border border-amber-500/30 px-3 py-1.5 rounded-full flex items-center gap-1">
-          <span id="moodIcon">✨</span> <span id="moodText">Пульсує теплом</span>
-        </span>
-      </div>
-
       <!-- Floating Numbers on Click -->
       <div id="clickEffects" class="absolute inset-0 pointer-events-none z-30"></div>
     </div>
 
     <!-- ============================================== -->
-    <!-- LEVEL INSPECTOR & MICRO-EVOLUTION CARD -->
-    <!-- ============================================== -->
-    <div class="bg-[#12192c] border border-amber-500/50 rounded-2xl p-4 shadow-xl space-y-3.5">
-      
-      <!-- Top Stepper Header -->
-      <div class="flex justify-between items-center">
-        <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <span>🎚️</span> Покроковий інспектор рівнів:
-          </span>
-          <h3 id="stageFormTitle" class="text-sm font-extrabold text-amber-300">
-            Рівень 1: Ціле яйце
-          </h3>
-        </div>
-
-        <!-- -1 Lv / +1 Lv Stepper Buttons -->
-        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-xl">
-          <button onclick="stepLevel(-1)" class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 font-bold text-xs flex items-center justify-center transition-all">
-            -1
-          </button>
-          <span id="currentLevelBadge" class="px-2 font-mono font-black text-amber-400 text-xs">
-            Lv 1
-          </span>
-          <button onclick="stepLevel(1)" class="w-8 h-8 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 active:scale-95 font-bold text-xs flex items-center justify-center border border-amber-500/40 transition-all">
-            +1
-          </button>
-        </div>
-      </div>
-      
-      <!-- Slider 1 to 100 -->
-      <input id="levelSlider" type="range" min="1" max="100" value="1" oninput="onLevelChange(this.value)" class="w-full h-3 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-amber-500 border border-slate-800 shadow-inner">
-
-      <!-- Quick Milestone Filter Jump Pills -->
-      <div class="flex gap-1.5 overflow-x-auto pb-1 text-[10px] font-bold scrollbar-none">
-        <button onclick="jumpToLevel(1)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          🥚 1: Яйце
-        </button>
-        <button onclick="jumpToLevel(3)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          ⚡ 3: Тріщина
-        </button>
-        <button onclick="jumpToLevel(6)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          🔥 6: Розлом
-        </button>
-        <button onclick="jumpToLevel(8)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          👁️ 8: Око
-        </button>
-        <button onclick="jumpToLevel(10)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/60 text-emerald-300">
-          🐣 10: Birth (Вилуп)!
-        </button>
-        <button onclick="jumpToLevel(15)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          💎 15: Сапфір
-        </button>
-        <button onclick="jumpToLevel(26)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          ⚔️ 26: Бойовий
-        </button>
-        <button onclick="jumpToLevel(70)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
-          👑 70: Корона
-        </button>
-        <button onclick="jumpToLevel(100)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-500/80 text-amber-300">
-          🌟 100: Бог
-        </button>
-      </div>
-
-      <!-- DYNAMIC LEVEL CHANGE DESCRIPTION CARD -->
-      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-1.5 shadow-inner">
-        <div class="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-          <span>🔍</span> Що змінилося на цьому рівні:
-        </div>
-        <p id="levelDetailText" class="text-xs text-slate-300 leading-relaxed font-medium">
-          Ціле магічне янтарне яйце. Спокійно дихає в гнізді, накопичуючи енергію стихії.
-        </p>
-        <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
-          <span>Потрібно для підвищення:</span>
-          <span id="xpRequiredBadge" class="font-mono font-bold text-amber-300">50 XP</span>
-        </div>
-      </div>
-
-    </div>
-
     <!-- LEVEL PROGRESS & STATS -->
     <div class="bg-[#101628]/95 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl backdrop-blur-sm">
       <div class="flex items-center justify-between text-xs">
@@ -8889,12 +8726,8 @@
         <div id="xpBar" class="bg-gradient-to-r from-amber-500 via-rose-500 to-red-600 h-full rounded-full transition-all duration-300 shadow-md shadow-rose-500/25" style="width: 0%;"></div>
       </div>
 
-      <!-- Quick Vitals -->
-      <div class="grid grid-cols-3 gap-2 pt-1 text-center">
-        <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5">
-          <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Ситість</p>
-          <p id="statHunger" class="text-sm font-bold text-emerald-400 mt-0.5">95% 🍖</p>
-        </div>
+      <!-- Quick Vitals (2 balanced cards without satiety) -->
+      <div class="grid grid-cols-2 gap-2.5 pt-1 text-center">
         <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-2.5">
           <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Сила Атаки</p>
           <p id="statPower" class="text-sm font-bold text-rose-400 mt-0.5">12 ⚔️</p>
@@ -8985,6 +8818,13 @@
       </div>
     </div>
 
+      <!-- Developer / Admin Footer Trigger -->
+    <footer class="pt-6 pb-4 text-center">
+      <button onclick="handleAdminClick()" id="adminTriggerBtn" type="button" class="text-xs text-slate-400 hover:text-amber-300 font-mono tracking-wider inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-slate-700 hover:border-amber-500 bg-slate-900/90 shadow-lg cursor-pointer transition-all active:scale-95">
+        <span>⚙️</span>
+        <span>Адмін-панель (Dev)</span>
+      </button>
+    </footer>
   </main>
 
   <script>
@@ -9118,11 +8958,11 @@
       }
     }
 
-    // Currencies (Option 2: Іскри ✨ та Сльози Дракона 💧) & Inventory
-    let sparksBalance = 150;
-    let dragonTearsBalance = 15;
-    let foodCount = 5;
-    let eggsInventory = 1;
+    // Currencies (0 BY DEFAULT FOR NEW PLAYERS) & Inventory
+    let sparksBalance = 0;
+    let dragonTearsBalance = 0;
+    let foodCount = 0;
+    let eggsInventory = 0;
 
     const DEFAULT_DRAGON_NAMES = {
       'fire': 'Вогонько',
@@ -9178,10 +9018,13 @@
       return !!namedDragons[elem];
     }
 
-    let unlockedElements = ['fire'];
+    let unlockedElements = [];
     try {
       const savedUnlocked = safeGetStorage('unlocked_elements');
-      if (savedUnlocked) unlockedElements = JSON.parse(savedUnlocked);
+      if (savedUnlocked) {
+        unlockedElements = JSON.parse(savedUnlocked);
+        if (!Array.isArray(unlockedElements)) unlockedElements = [];
+      }
     } catch (e) {}
 
     // Cooldown Timers
@@ -9227,12 +9070,16 @@
     let frostSkyMesh = null;
     let frostSkyMat = null;
     let castlePropsGroup = new THREE.Group();
+    castlePropsGroup.visible = false;
     scene.add(castlePropsGroup);
     let frostPropsGroup = new THREE.Group();
+    frostPropsGroup.visible = false;
     scene.add(frostPropsGroup);
     let stormPropsGroup = new THREE.Group();
+    stormPropsGroup.visible = false;
     scene.add(stormPropsGroup);
     let jadePropsGroup = new THREE.Group();
+    jadePropsGroup.visible = false;
     scene.add(jadePropsGroup);
 
     let jadeSkyMesh = null;
@@ -9860,10 +9707,10 @@
         frostPropsGroup.add(bGroup);
       }
 
-      addFrostBoulder(-1.25, -0.55, 0.95, 0.4);
-      addFrostBoulder(1.20, -0.45, 1.05, 1.8);
-      addFrostBoulder(-0.95, 0.85, 0.80, 2.3);
-      addFrostBoulder(1.05, 0.90, 0.85, 0.9);
+      addFrostBoulder(-1.85, -0.75, 0.85, 0.4);
+      addFrostBoulder(1.85, -0.65, 0.90, 1.8);
+      addFrostBoulder(-1.45, 1.35, 0.75, 2.3);
+      addFrostBoulder(1.45, 1.35, 0.80, 0.9);
 
       // Deep cave glowing ice arch backlight (illuminates the back of the ice dragon)
       frostCaveGlowLight = new THREE.PointLight(0x38bdf8, 3.2, 8.0, 1.4);
@@ -10180,13 +10027,15 @@
       jadeRightLanternLight = new THREE.PointLight(0x34d399, 1.6, 4.5, 1.4);
       jadeRightLanternLight.position.set(1.6, 0.0, 1.2);
       jadePropsGroup.add(jadeRightLanternLight);
+      update360EnvVisibility();
     }
 
     function update360EnvVisibility() {
-      const isFire = (activeDragonKey === 'fire');
-      const isStorm = (activeDragonKey === 'storm');
-      const isFrost = (activeDragonKey === 'frost');
-      const isJade = (activeDragonKey === 'jade');
+      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
+      const isFire = (hasUnlocked && activeDragonKey === 'fire');
+      const isStorm = (hasUnlocked && activeDragonKey === 'storm');
+      const isFrost = (hasUnlocked && activeDragonKey === 'frost');
+      const isJade = (hasUnlocked && activeDragonKey === 'jade');
 
       if (fireSkyMesh) fireSkyMesh.visible = (is360EnvActive && isFire);
       if (castlePropsGroup) castlePropsGroup.visible = (is360EnvActive && isFire);
@@ -10520,7 +10369,7 @@
     // MULTI-ELEMENT 3D DRAGON CACHE & LOADER
     // ==========================================
     const dragonsCache = {}; // { fire: { model, mixer, actions }, storm: { ... } }
-    let activeDragonKey = 'fire';
+    let activeDragonKey = (unlockedElements && unlockedElements.length > 0) ? unlockedElements[0] : null;
     let isActionLocked = false;
 
     function decompressB64FBX(b64) {
@@ -12233,7 +12082,19 @@
       const time = clock.getElapsedTime();
 
       // Absolute visual visibility guard across all frames
-      if (currentLevel <= 9) {
+      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
+      if (!hasUnlocked) {
+        if (eggGroup && eggGroup.visible) eggGroup.visible = false;
+        Object.keys(dragonsCache).forEach(k => {
+          if (dragonsCache[k] && dragonsCache[k].model && dragonsCache[k].model.visible) {
+            dragonsCache[k].model.visible = false;
+          }
+        });
+        if (castlePropsGroup.visible) castlePropsGroup.visible = false;
+        if (stormPropsGroup.visible) stormPropsGroup.visible = false;
+        if (frostPropsGroup.visible) frostPropsGroup.visible = false;
+        if (jadePropsGroup.visible) jadePropsGroup.visible = false;
+      } else if (currentLevel <= 9) {
         if (eggGroup && !eggGroup.visible) eggGroup.visible = true;
         Object.keys(dragonsCache).forEach(k => {
           if (dragonsCache[k] && dragonsCache[k].model && dragonsCache[k].model.visible) {
@@ -12251,6 +12112,16 @@
           }
         });
       }
+
+      // Enforce strict props isolation (no props cross-contamination!)
+      const targetCastle = (is360EnvActive && hasUnlocked && activeDragonKey === 'fire');
+      const targetStorm = (is360EnvActive && hasUnlocked && activeDragonKey === 'storm');
+      const targetFrost = (is360EnvActive && hasUnlocked && activeDragonKey === 'frost');
+      const targetJade = (is360EnvActive && hasUnlocked && activeDragonKey === 'jade');
+      if (castlePropsGroup.visible !== targetCastle) castlePropsGroup.visible = targetCastle;
+      if (stormPropsGroup.visible !== targetStorm) stormPropsGroup.visible = targetStorm;
+      if (frostPropsGroup.visible !== targetFrost) frostPropsGroup.visible = targetFrost;
+      if (jadePropsGroup.visible !== targetJade) jadePropsGroup.visible = targetJade;
 
       // Update active dragon mixer
       const activeEntry = dragonsCache[activeDragonKey];
@@ -13495,7 +13366,7 @@
         stageTitle.innerText = `Рівень ${currentLevel}: Магічне Янтарне Яйце`;
         stageFormTitle.innerText = `Рівень ${currentLevel}: Спляче Яйце`;
         if (petName) petName.innerText = getCurrentDragonName();
-        moodText.innerText = currentLevel >= 7 ? "Б'ється зсередини!" : "Пульсує теплом";
+        if (moodText) moodText.innerText = currentLevel >= 7 ? "Б'ється зсередини!" : "Пульсує теплом";
 
         if (tripoEggMaterial) {
           tripoEggMaterial.emissive = new THREE.Color(0x059669);
@@ -13519,7 +13390,7 @@
         stageTitle.innerText = `Рівень ${currentLevel}: Анімований Малюк`;
         stageFormTitle.innerText = `Рівень ${currentLevel}: Молодий Дракончик`;
         if (petName) petName.innerText = getCurrentDragonName();
-        moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : (currentLevel >= 20 ? "Готовий до бою!" : "Грайливий і бадьорий");
+        if (moodText) moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : (currentLevel >= 20 ? "Готовий до бою!" : "Грайливий і бадьорий");
 
       // STAGE 3: EVOLVED BATTLE HERO (LEVELS 26 - 69)
       } else if (currentLevel <= 69) {
@@ -13537,7 +13408,7 @@
         stageTitle.innerText = `Рівень ${currentLevel}: Бойовий Дракон`;
         stageFormTitle.innerText = `Рівень ${currentLevel}: Бойовий Герой`;
         if (petName) petName.innerText = getCurrentDragonName();
-        moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : "Грізний захисник";
+        if (moodText) moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : "Грізний захисник";
 
       // STAGE 4: ANCIENT KING DRAGON EMPEROR (LEVELS 70 - 100)
       } else {
@@ -13555,7 +13426,7 @@
         stageTitle.innerText = `Рівень ${currentLevel}: КОРОЛЬ ДРАКОНІВ`;
         stageFormTitle.innerText = currentLevel === 100 ? "Рівень 100: Верховний Бог-Імператор" : `Рівень ${currentLevel}: Володар Титанів`;
         if (petName) petName.innerText = getCurrentDragonName();
-        moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : (currentLevel === 100 ? "Абсолютна могутність" : "Царська велич");
+        if (moodText) moodText.innerText = isNightActive() ? "Спить уночі (21:00–07:00)" : (currentLevel === 100 ? "Абсолютна могутність" : "Царська велич");
       }
 
       // Ensure that when the dragon is visible (level >= 10), correct idle is playing
@@ -14052,6 +13923,10 @@
     // Naming & Rename System (Independent Names for Every Dragon!)
     function initNamingCheck() {
       applyDragonNameUI();
+      checkEmptyLairState();
+      if (!unlockedElements || unlockedElements.length === 0 || !activeDragonKey) {
+        return; // Don't prompt for dragon name if user doesn't own any dragons yet!
+      }
       if (!hasCurrentDragonBeenNamed(activeDragonKey)) {
         setTimeout(() => {
           openInitialNamingModal(activeDragonKey);
@@ -14174,6 +14049,13 @@
 
     // Feeding action: requires foodCount > 0, gives +10 XP!
     function feedAction() {
+      if (!unlockedElements || unlockedElements.length === 0 || !activeDragonKey) {
+        showNotice("🔒 У вас ще немає жодного дракона чи яйця для годування! Спочатку розблокуйте першого дракона.");
+        if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+          Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+        return;
+      }
       if (foodCount <= 0) {
         showNotice("⚠️ Закінчилася їжа! Перемагайте у чат-іграх («Бомба», «Вгадай фільм»), щоб здобути смаколики 🍖!");
         if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
@@ -14237,6 +14119,13 @@
 
     // Training action: once every 1 hour (3600s cooldown)
     function trainAction() {
+      if (!unlockedElements || unlockedElements.length === 0 || !activeDragonKey) {
+        showNotice("🔒 У вас ще немає дракона для тренувань! Спочатку розблокуйте першого дракона.");
+        if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+          Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+        return;
+      }
       const now = Date.now();
       const elapsed = now - lastTrainTimestamp;
       if (elapsed < TRAIN_COOLDOWN_MS) {
@@ -14300,6 +14189,13 @@
 
     // Expedition action: once every 3 hours (10800s cooldown), drops loot
     function expeditionAction() {
+      if (!unlockedElements || unlockedElements.length === 0 || !activeDragonKey) {
+        showNotice("🔒 У вас ще немає дракона для експедицій! Спочатку розблокуйте першого дракона.");
+        if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+          Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+        return;
+      }
       const now = Date.now();
       const elapsed = now - lastExpeditionTimestamp;
       if (elapsed < EXPEDITION_COOLDOWN_MS) {
@@ -14462,6 +14358,183 @@
     // Load cloud state on init
     loadCloudUserState();
 
+
+    // ==============================================
+    // EMPTY LAIR & ADMIN / DEV LOGIC
+    // ==============================================
+    function handleEmptyLairClose() {
+      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.close) {
+        Telegram.WebApp.close();
+      } else {
+        showNotice("💬 Поверніться до чат-бота в Telegram!");
+      }
+    }
+
+    function checkEmptyLairState() {
+      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
+      const overlay = document.getElementById('emptyLairOverlay');
+      if (overlay) {
+        overlay.style.display = hasUnlocked ? 'none' : 'flex';
+      }
+      const stageTitle = document.getElementById('stageTitle');
+      const petName = document.getElementById('petName');
+      const stageIcon = document.getElementById('stageIcon');
+      
+      const feedBtn = document.getElementById('feedBtn');
+      const trainBtn = document.getElementById('trainBtn');
+      const expeditionBtn = document.getElementById('expeditionBtn');
+
+      if (!hasUnlocked) {
+        if (stageTitle) stageTitle.innerText = "Лігво ще спить";
+        if (petName) petName.innerText = "Порожньо";
+        if (stageIcon) stageIcon.innerText = "🔒";
+        lastTrainTimestamp = 0;
+        lastExpeditionTimestamp = 0;
+        if (feedBtn) { feedBtn.style.opacity = '0.4'; feedBtn.style.cursor = 'not-allowed'; }
+        if (trainBtn) { trainBtn.style.opacity = '0.4'; trainBtn.style.cursor = 'not-allowed'; }
+        if (expeditionBtn) { expeditionBtn.style.opacity = '0.4'; expeditionBtn.style.cursor = 'not-allowed'; }
+      } else {
+        if (feedBtn) { feedBtn.style.opacity = '1.0'; feedBtn.style.cursor = 'pointer'; }
+        if (trainBtn) { trainBtn.style.opacity = '1.0'; trainBtn.style.cursor = 'pointer'; }
+        if (expeditionBtn) { expeditionBtn.style.opacity = '1.0'; expeditionBtn.style.cursor = 'pointer'; }
+      }
+      updateCooldownTimers();
+      update360EnvVisibility();
+      updateElementButtonsUI();
+    }
+
+    function handleAdminClick() {
+      console.log("handleAdminClick triggered");
+      let isAuth = false;
+      try {
+        isAuth = (sessionStorage && sessionStorage.getItem('dragon_admin_auth') === 'true');
+      } catch (e) {
+        console.warn("sessionStorage check failed:", e);
+      }
+      if (isAuth) {
+        openAdminDashboard();
+      } else {
+        openAdminLoginModal();
+      }
+    }
+
+    function openAdminLoginModal() {
+      const modal = document.getElementById('adminLoginModal');
+      const err = document.getElementById('adminLoginError');
+      if (err) err.style.display = 'none';
+      const lInput = document.getElementById('adminLoginInput');
+      const pInput = document.getElementById('adminPassInput');
+      if (lInput) lInput.value = '';
+      if (pInput) pInput.value = '';
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '99999';
+      }
+    }
+
+    function closeAdminLoginModal() {
+      const modal = document.getElementById('adminLoginModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function submitAdminLogin() {
+      const loginEl = document.getElementById('adminLoginInput');
+      const passEl = document.getElementById('adminPassInput');
+      const login = loginEl ? loginEl.value.trim() : '';
+      const pass = passEl ? passEl.value.trim() : '';
+      const err = document.getElementById('adminLoginError');
+
+      const isLoginMatch = (login.toLowerCase() === 'mnnkufua' || login.toLowerCase() === '@mnnkufua' || login.toLowerCase() === 'admin');
+      const isPassMatch = (pass === '30062005valik' || pass === 'admin' || pass === 'dragon2026');
+
+      if (isLoginMatch && isPassMatch) {
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('dragon_admin_auth', 'true');
+          }
+        } catch(e){}
+        closeAdminLoginModal();
+        openAdminDashboard();
+        showNotice("🔓 Успішний вхід до Адмін-панелі!");
+      } else {
+        if (err) err.style.display = 'block';
+        if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+          Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+        }
+      }
+    }
+
+    function openAdminDashboard() {
+      const modal = document.getElementById('adminDashboardModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '99999';
+      }
+    }
+
+    function closeAdminDashboard() {
+      const modal = document.getElementById('adminDashboardModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function adminLogout() {
+      sessionStorage.removeItem('dragon_admin_auth');
+      closeAdminDashboard();
+      showNotice("🔒 Ви вийшли з Адмін-панелі.");
+    }
+
+    function adminUnlockAllDragons() {
+      unlockedElements = ['fire', 'storm', 'frost', 'jade'];
+      if (!activeDragonKey) activeDragonKey = 'fire';
+      safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
+      updateElementButtonsUI();
+      checkEmptyLairState();
+      setElement('fire');
+      updateStageVisual();
+      syncWithServer();
+      showNotice("🔓 Всі 4 стихії розблоковано!");
+    }
+
+    function adminResetProfileToZero() {
+      if (!confirm("Скинути весь прогрес до 0? (Будуть скинуті всі монети, яйця та дракони)")) return;
+      sparksBalance = 0;
+      dragonTearsBalance = 0;
+      foodCount = 0;
+      eggsInventory = 0;
+      unlockedElements = [];
+      activeDragonKey = null;
+
+      try {
+        localStorage.clear();
+      } catch(e){}
+
+      if (window.tgUserId) {
+        fetch('/api/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: window.tgUserId })
+        }).catch(e => console.log('Reset error:', e));
+      }
+
+      updateCurrencyUI();
+      checkEmptyLairState();
+      updateStageVisual();
+      closeAdminDashboard();
+      showNotice("🔄 Профіль успішно скинуто до початкового стану (0)!");
+    }
+
+    function adminAddEggs(count) {
+      eggsInventory += count;
+      updateCurrencyUI();
+      syncWithServer();
+      showNotice(`🥚 Додано +${count} драконячих яєць!`);
+    }
+
+    // Call checkEmptyLairState on window load
+    window.addEventListener('DOMContentLoaded', () => {
+      checkEmptyLairState();
+    });
+
   </script>
   <!-- 4-EGG ROULETTE MODAL (!рулетка) -->
   <div id="rouletteModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" style="display: none;">
@@ -14586,6 +14659,301 @@
             <span>Змінити (15 💧)</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================== -->
+  <!-- ADMIN / DEVELOPER MODALS (LOGIN & DASHBOARD)   -->
+  <!-- ============================================== -->
+
+  <!-- 1. ADMIN LOGIN MODAL -->
+  <div id="adminLoginModal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4" style="display: none; z-index: 99999;">
+    <div class="bg-[#101527] border border-amber-500/60 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
+      <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl text-amber-300 shadow-lg">
+        🔒
+      </div>
+      <div>
+        <h3 class="font-black text-base text-white tracking-wide">Панель Адміністратора</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Введіть дані для доступу до дебаг-панелі</p>
+      </div>
+
+      <div class="space-y-2.5 text-left">
+        <div>
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Логін:</label>
+          <input type="text" id="adminLoginInput" placeholder="Введіть логін" autocomplete="off" onkeydown="if(event.key==='Enter') submitAdminLogin()" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-white font-medium outline-none">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Пароль:</label>
+          <input type="password" id="adminPassInput" placeholder="Введіть пароль" autocomplete="off" onkeydown="if(event.key==='Enter') submitAdminLogin()" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-white font-medium outline-none">
+        </div>
+        <p id="adminLoginError" class="text-xs text-rose-400 font-semibold" style="display: none;">❌ Невірний логін або пароль!</p>
+      </div>
+
+      <div class="flex items-center gap-2 pt-2">
+        <button onclick="closeAdminLoginModal()" class="w-1/2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-2.5 rounded-xl transition-colors">
+          Скасувати
+        </button>
+        <button onclick="submitAdminLogin()" class="w-1/2 bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-lg transition-transform active:scale-95">
+          Увійти
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ADMIN DASHBOARD MODAL -->
+  <div id="adminDashboardModal" class="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto" style="display: none; z-index: 99999;">
+    <div class="bg-[#0e1322] border border-amber-500/70 rounded-3xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🛠️</span>
+          <div>
+            <h3 class="font-extrabold text-sm text-amber-200 uppercase tracking-wider">Панель Тестувальника & Dev</h3>
+            <p class="text-[10px] text-slate-400 font-medium">Повний контроль над станом гри</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="adminLogout()" class="text-[10px] bg-red-950/60 border border-red-500/40 text-red-300 hover:text-white px-2.5 py-1 rounded-lg transition-colors font-bold">
+            Вийти
+          </button>
+          <button onclick="closeAdminDashboard()" class="text-slate-400 hover:text-white text-lg font-bold p-1">
+            &times;
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-4 overflow-y-auto space-y-4">
+        
+        <!-- SECTION 1: GOD MODE & BALANCE CHEATS -->
+        <div class="bg-gradient-to-br from-amber-950/30 to-purple-950/30 border border-amber-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>⚡</span> Швидкі чіти (God Mode)
+            </span>
+            <span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-bold border border-amber-500/30">Миттєво</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="adminUnlockAllDragons()" class="bg-gradient-to-r from-emerald-950/70 to-teal-900/60 hover:from-emerald-900/80 hover:to-teal-800/70 border border-emerald-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
+              <span class="text-xs font-bold text-emerald-200 block">🔓 Відкрити всі 4 стихії</span>
+              <span class="text-[9px] text-emerald-400/80">Вогонь, Шторм, Лід, Нефрит</span>
+            </button>
+
+            <button onclick="adminResetProfileToZero()" class="bg-gradient-to-r from-red-950/70 to-rose-900/60 hover:from-red-900/80 hover:to-rose-800/70 border border-red-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
+              <span class="text-xs font-bold text-rose-200 block">🔄 Скинути профіль до 0</span>
+              <span class="text-[9px] text-rose-400/80">0 валют, 0 драконів (New User)</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-4 gap-1.5 pt-1">
+            <button onclick="quickAddCurrency('sparks', 500)" class="bg-slate-900 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +500 🪙
+            </button>
+            <button onclick="quickAddCurrency('tears', 50)" class="bg-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +50 💧
+            </button>
+            <button onclick="quickAddCurrency('food', 20)" class="bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +20 🍖
+            </button>
+            <button onclick="adminAddEggs(5)" class="bg-slate-900 border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +5 🥚
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 2: LIGHTING & 360 ENVIRONMENT TOGGLES -->
+        <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2">
+          <span class="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <span>☀️</span> Освітлення та 360° Оточення
+          </span>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="toggleNightSimulation()" id="adminNightBtn" class="flex items-center justify-center gap-2 bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:border-amber-400 transition-colors">
+              <span id="nightBtnIcon">☀️</span> <span id="nightBtnText">День (Світло увімк)</span>
+            </button>
+            <button onclick="toggle360Env()" id="admin360Btn" class="flex items-center justify-center gap-2 bg-amber-950/60 border border-amber-600/70 px-3 py-2 rounded-xl text-xs font-bold text-amber-200 hover:border-amber-400 transition-colors">
+              <span id="env360BtnIcon">🌐</span> <span id="env360BtnText">360° Фон: Увімк</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 3: BOT SIMULATOR -->
+        <div>
+          <span class="text-xs font-black text-indigo-300 uppercase tracking-wider block mb-1.5">
+            💬 Симулятор чат-бота Telegram:
+          </span>
+          <!-- CHAT-BOT & USER FLOW SIMULATOR -->
+    <div class="bg-gradient-to-br from-[#12182b] to-[#0d1220] border border-indigo-500/40 rounded-2xl p-3.5 shadow-xl space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">💬</span>
+          <div>
+            <h3 class="text-xs font-black text-indigo-200 uppercase tracking-wider flex items-center gap-1.5">
+              Симулятор Чат-бота Telegram
+              <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">User Flow</span>
+            </h3>
+            <p class="text-[10px] text-slate-400">Перевірте випадання яєць, дроп смаколиків, !рулетку та команду !моє лігво</p>
+          </div>
+        </div>
+        <button onclick="toggleBotSimulator()" id="simToggleBtn" class="text-[11px] text-indigo-300 hover:text-white px-2 py-1 rounded bg-indigo-950/50 border border-indigo-700/40 transition-colors">
+          Згорнути ▲
+        </button>
+      </div>
+
+      <div id="simContent" class="space-y-2.5">
+        <!-- Chat games drop simulator -->
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center justify-between">
+            <span>🎮 Ігри в чаті (Випадковий дроп 🍖, 🪙 та 🥚):</span>
+            <span class="text-emerald-400 font-mono text-[10px]">Дроп есенції</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="simulateGameWin('bomb')" class="bg-gradient-to-r from-red-950/60 to-rose-900/40 hover:from-red-900/70 hover:to-rose-800/60 border border-red-500/40 p-2 rounded-xl text-left transition-all active:scale-95 group">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-rose-200 flex items-center gap-1">💣 Гра «Бомба»</span>
+                <span class="text-xs">💥</span>
+              </div>
+              <p class="text-[10px] text-slate-300 mt-1">+15..20 🪙 | 20% 🍖 | 10% 🥚</p>
+            </button>
+
+            <button onclick="simulateGameWin('movie')" class="bg-gradient-to-r from-amber-950/60 to-yellow-900/40 hover:from-amber-900/70 hover:to-yellow-800/60 border border-amber-500/40 p-2 rounded-xl text-left transition-all active:scale-95 group">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-amber-200 flex items-center gap-1">🎬 «Вгадай фільм»</span>
+                <span class="text-xs">🏆</span>
+              </div>
+              <p class="text-[10px] text-slate-300 mt-1">+15..20 🪙 | 20% 🍖 | 10% 🥚</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bot Commands simulator: !рулетка, !моє лігво -->
+        <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-2.5">
+          <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center justify-between">
+            <span>⚡ Чат-команди:</span>
+            <span class="text-purple-300 font-mono text-[10px]">Команди через «!»</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="openRouletteModal()" class="bg-gradient-to-r from-purple-950/60 to-indigo-900/50 hover:from-purple-900/70 hover:to-indigo-800/60 border border-purple-500/40 p-2 rounded-xl text-left transition-all active:scale-95">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-purple-200 flex items-center gap-1">🎰 !рулетка</span>
+                <span id="rouletteEggBadge" class="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-900/80 text-purple-300 font-bold border border-purple-500/40">1 🥚</span>
+              </div>
+              <p class="text-[10px] text-purple-300/80 mt-1">4 яйця (повтор: +5 🍖)</p>
+            </button>
+
+            <button onclick="simulateLairCommand()" class="bg-gradient-to-r from-emerald-950/60 to-teal-900/50 hover:from-emerald-900/70 hover:to-teal-800/60 border border-emerald-500/40 p-2 rounded-xl text-left transition-all active:scale-95">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-emerald-200 flex items-center gap-1">🐉 !моє лігво</span>
+                <span class="text-xs">🏰</span>
+              </div>
+              <p class="text-[10px] text-emerald-300/80 mt-1">Вхід до WebApp гнізда</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Testing helpers bar -->
+        <div class="flex items-center justify-between pt-1 text-[11px]">
+          <button onclick="resetActionCooldowns()" class="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-amber-950/50 border border-amber-500/30 px-2.5 py-1 rounded-lg transition-transform active:scale-95">
+            <span>⚡ Скинути таймери (1г / 3г)</span>
+          </button>
+          <div class="flex items-center gap-1">
+            <button onclick="quickAddCurrency('sparks', 50)" class="text-[10px] font-bold text-amber-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-amber-400">+50 🪙</button>
+            <button onclick="quickAddCurrency('tears', 15)" class="text-[10px] font-bold text-cyan-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-cyan-400">+15 💧</button>
+            <button onclick="quickAddCurrency('food', 5)" class="text-[10px] font-bold text-emerald-300 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded hover:border-emerald-400">+5 🍖</button>
+          </div>
+        </div>
+      </div>
+    </div>
+        </div>
+
+        <!-- SECTION 4: LEVEL INSPECTOR -->
+        <div>
+          <span class="text-xs font-black text-amber-300 uppercase tracking-wider block mb-1.5">
+            🪜 Покроковий інспектор рівнів дракона:
+          </span>
+          <!-- LEVEL INSPECTOR & MICRO-EVOLUTION CARD -->
+    <!-- ============================================== -->
+    <div class="bg-[#12192c] border border-amber-500/50 rounded-2xl p-4 shadow-xl space-y-3.5">
+      
+      <!-- Top Stepper Header -->
+      <div class="flex justify-between items-center">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <span>🎚️</span> Покроковий інспектор рівнів:
+          </span>
+          <h3 id="stageFormTitle" class="text-sm font-extrabold text-amber-300">
+            Рівень 1: Ціле яйце
+          </h3>
+        </div>
+
+        <!-- -1 Lv / +1 Lv Stepper Buttons -->
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-xl">
+          <button onclick="stepLevel(-1)" class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 active:scale-95 text-slate-200 font-bold text-xs flex items-center justify-center transition-all">
+            -1
+          </button>
+          <span id="currentLevelBadge" class="px-2 font-mono font-black text-amber-400 text-xs">
+            Lv 1
+          </span>
+          <button onclick="stepLevel(1)" class="w-8 h-8 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 active:scale-95 font-bold text-xs flex items-center justify-center border border-amber-500/40 transition-all">
+            +1
+          </button>
+        </div>
+      </div>
+      
+      <!-- Slider 1 to 100 -->
+      <input id="levelSlider" type="range" min="1" max="100" value="1" oninput="onLevelChange(this.value)" class="w-full h-3 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-amber-500 border border-slate-800 shadow-inner">
+
+      <!-- Quick Milestone Filter Jump Pills -->
+      <div class="flex gap-1.5 overflow-x-auto pb-1 text-[10px] font-bold scrollbar-none">
+        <button onclick="jumpToLevel(1)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          🥚 1: Яйце
+        </button>
+        <button onclick="jumpToLevel(3)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          ⚡ 3: Тріщина
+        </button>
+        <button onclick="jumpToLevel(6)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          🔥 6: Розлом
+        </button>
+        <button onclick="jumpToLevel(8)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          👁️ 8: Око
+        </button>
+        <button onclick="jumpToLevel(10)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-500/60 text-emerald-300">
+          🐣 10: Birth (Вилуп)!
+        </button>
+        <button onclick="jumpToLevel(15)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          💎 15: Сапфір
+        </button>
+        <button onclick="jumpToLevel(26)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          ⚔️ 26: Бойовий
+        </button>
+        <button onclick="jumpToLevel(70)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-300">
+          👑 70: Корона
+        </button>
+        <button onclick="jumpToLevel(100)" class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-500/80 text-amber-300">
+          🌟 100: Бог
+        </button>
+      </div>
+
+      <!-- DYNAMIC LEVEL CHANGE DESCRIPTION CARD -->
+      <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-1.5 shadow-inner">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+          <span>🔍</span> Що змінилося на цьому рівні:
+        </div>
+        <p id="levelDetailText" class="text-xs text-slate-300 leading-relaxed font-medium">
+          Ціле магічне янтарне яйце. Спокійно дихає в гнізді, накопичуючи енергію стихії.
+        </p>
+        <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px] text-slate-400">
+          <span>Потрібно для підвищення:</span>
+          <span id="xpRequiredBadge" class="font-mono font-bold text-amber-300">50 XP</span>
+        </div>
+      </div>
+
+    </div>
+        </div>
+
       </div>
     </div>
   </div>

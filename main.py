@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from aiogram import Bot
 from bot import dp, BOT_TOKEN, WEBAPP_URL
-from database import init_db, get_or_create_user, update_user
+from database import init_db, get_or_create_user, update_user, reset_user
 
 bot = None
 
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     if BOT_TOKEN:
         bot = Bot(token=BOT_TOKEN)
         bot_task = asyncio.create_task(dp.start_polling(bot))
-        print("🤖 Telegram Bot polling started successfully!")
+        print("🚀 Telegram Bot polling started successfully!")
     else:
         print("⚠️ BOT_TOKEN not provided! WebApp server running only.")
 
@@ -79,6 +79,14 @@ async def sync_user_data(request: Request):
         await update_user(int(user_id), **update_fields)
 
     return {"status": "success"}
+
+@app.post("/api/reset")
+async def reset_user_endpoint(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    if user_id:
+        await reset_user(int(user_id))
+    return {"status": "reset_successful"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
