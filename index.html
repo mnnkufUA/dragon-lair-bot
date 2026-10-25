@@ -8655,6 +8655,12 @@
     <!-- REAL 3D VIEWPORT (THREE.JS CANVAS, 360 ROTATION, SKELETAL ANIMATIONS) -->
     <div id="dragonViewport" class="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-b from-[#13192c] to-[#0a0d16] p-4 shadow-2xl flex flex-col items-center justify-between min-h-[440px] cursor-grab active:cursor-grabbing transition-colors duration-700">
       
+      <!-- 360 Environment Floating Toggle for Normal Players -->
+      <button onclick="toggle360Env()" id="env360PlayerToggleBtn" type="button" class="absolute bottom-3.5 right-3.5 z-20 flex items-center gap-1.5 bg-slate-900/85 hover:bg-slate-800/95 border border-slate-700/80 hover:border-amber-500/80 text-amber-200 text-xs font-bold px-3 py-1.5 rounded-full shadow-lg backdrop-blur-md transition-all active:scale-95 cursor-pointer" title="Увімкнути / вимкнути 360° фон">
+        <span id="env360PlayerIcon">🌐</span>
+        <span id="env360PlayerText">360° Фон: Увімк</span>
+      </button>
+
       <!-- Top Stage Title -->
       <div class="relative z-20 text-center space-y-1 mb-1 pointer-events-none">
         <div class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-slate-900/90 border border-slate-700/70 shadow-md backdrop-blur-md">
@@ -9026,6 +9032,58 @@
         if (!Array.isArray(unlockedElements)) unlockedElements = [];
       }
     } catch (e) {}
+
+    // Independent Dragon Levels & XP System (each dragon grows separately!)
+    let dragonLevels = {
+      'fire': 1,
+      'storm': 1,
+      'frost': 1,
+      'jade': 1
+    };
+
+    let dragonXP = {
+      'fire': 0,
+      'storm': 0,
+      'frost': 0,
+      'jade': 0
+    };
+
+    try {
+      const savedLevels = safeGetStorage('dragon_levels');
+      if (savedLevels) {
+        Object.assign(dragonLevels, JSON.parse(savedLevels));
+      }
+      const savedXP = safeGetStorage('dragon_xp');
+      if (savedXP) {
+        Object.assign(dragonXP, JSON.parse(savedXP));
+      }
+    } catch (e) {}
+
+    function syncActiveDragonStats() {
+      if (!activeDragonKey) return;
+      currentLevel = dragonLevels[activeDragonKey] || 1;
+      currentXP = dragonXP[activeDragonKey] || 0;
+      maxXP = Math.round(50 * Math.pow(currentLevel, 1.32));
+
+      const xpText = document.getElementById('xpText');
+      const xpBar = document.getElementById('xpBar');
+      const xpRequiredBadge = document.getElementById('xpRequiredBadge');
+      const levelSlider = document.getElementById('levelSlider');
+      const currentLevelBadge = document.getElementById('currentLevelBadge');
+      const statPower = document.getElementById('statPower');
+      const levelDetailText = document.getElementById('levelDetailText');
+
+      if (xpText) xpText.innerText = `${currentXP} / ${maxXP} XP`;
+      if (xpBar) xpBar.style.width = `${Math.min(100, (currentXP / maxXP) * 100)}%`;
+      if (xpRequiredBadge) xpRequiredBadge.innerText = `${maxXP} XP`;
+      if (levelSlider) levelSlider.value = currentLevel;
+      if (currentLevelBadge) currentLevelBadge.innerText = `Lv ${currentLevel}`;
+      if (statPower) {
+        const power = Math.round(10 + Math.pow(currentLevel, 1.55));
+        statPower.innerText = `${power} ⚔️`;
+      }
+      if (levelDetailText) levelDetailText.innerText = getLevelLore(currentLevel);
+    }
 
     // Cooldown Timers
     let lastTrainTimestamp = 0;
@@ -10046,25 +10104,22 @@
       if (jadeSkyMesh) jadeSkyMesh.visible = (is360EnvActive && isJade);
       if (jadePropsGroup) jadePropsGroup.visible = (is360EnvActive && isJade);
 
-      const btn = document.getElementById('env360ToggleBtn');
-      const icon = document.getElementById('env360BtnIcon');
-      const text = document.getElementById('env360BtnText');
-      if (btn) {
-        btn.style.opacity = '1.0';
-        btn.style.pointerEvents = 'auto';
-        if (isFire) {
-          text.innerText = is360EnvActive ? '360° Замок: Увімк' : '360° Замок: Вимк';
-          icon.innerText = is360EnvActive ? '👑' : '⬛';
-        } else if (isStorm) {
-          text.innerText = is360EnvActive ? '360° Шпиль: Увімк' : '360° Шпиль: Вимк';
-          icon.innerText = is360EnvActive ? '⚡' : '⬛';
-        } else if (isFrost) {
-          text.innerText = is360EnvActive ? '360° Печера: Увімк' : '360° Печера: Вимк';
-          icon.innerText = is360EnvActive ? '❄️' : '⬛';
-        } else if (isJade) {
-          text.innerText = is360EnvActive ? '360° Святилище: Увімк' : '360° Святилище: Вимк';
-          icon.innerText = is360EnvActive ? '🌿' : '⬛';
-        }
+      const playerText = document.getElementById('env360PlayerText');
+      const playerIcon = document.getElementById('env360PlayerIcon');
+      if (playerText) {
+        playerText.innerText = is360EnvActive ? '360° Фон: Увімк' : '360° Фон: Вимк';
+      }
+      if (playerIcon) {
+        playerIcon.innerText = is360EnvActive ? '🌐' : '⬛';
+      }
+
+      const adminText = document.getElementById('env360BtnText');
+      const adminIcon = document.getElementById('env360BtnIcon');
+      if (adminText) {
+        adminText.innerText = is360EnvActive ? '360° Фон: Увімк' : '360° Фон: Вимк';
+      }
+      if (adminIcon) {
+        adminIcon.innerText = is360EnvActive ? '🌐' : '⬛';
       }
     }
 
@@ -12085,7 +12140,11 @@
       const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
       if (!hasUnlocked) {
         if (eggGroup && eggGroup.visible) eggGroup.visible = false;
-        Object.keys(dragonsCache).forEach(k => {
+        if (typeof update360EnvVisibility === 'function') {
+        update360EnvVisibility();
+      }
+
+      Object.keys(dragonsCache).forEach(k => {
           if (dragonsCache[k] && dragonsCache[k].model && dragonsCache[k].model.visible) {
             dragonsCache[k].model.visible = false;
           }
@@ -12096,14 +12155,22 @@
         if (jadePropsGroup.visible) jadePropsGroup.visible = false;
       } else if (currentLevel <= 9) {
         if (eggGroup && !eggGroup.visible) eggGroup.visible = true;
-        Object.keys(dragonsCache).forEach(k => {
+        if (typeof update360EnvVisibility === 'function') {
+        update360EnvVisibility();
+      }
+
+      Object.keys(dragonsCache).forEach(k => {
           if (dragonsCache[k] && dragonsCache[k].model && dragonsCache[k].model.visible) {
             dragonsCache[k].model.visible = false;
           }
         });
       } else {
         if (eggGroup && eggGroup.visible) eggGroup.visible = false;
-        Object.keys(dragonsCache).forEach(k => {
+        if (typeof update360EnvVisibility === 'function') {
+        update360EnvVisibility();
+      }
+
+      Object.keys(dragonsCache).forEach(k => {
           if (dragonsCache[k] && dragonsCache[k].model) {
             const shouldBeVisible = (k === activeDragonKey);
             if (dragonsCache[k].model.visible !== shouldBeVisible) {
@@ -13188,19 +13255,21 @@
           `;
         } else if (isActive) {
           // Active selected dragon
+          const lvl = dragonLevels[item.key] || 1;
           btn.className = `element-btn border-2 ${item.activeBorder} ${item.activeBg} py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 shadow-lg ${item.activeShadow} opacity-100 cursor-pointer`;
           btn.innerHTML = `
             <span class="text-lg">${item.icon}</span>
             <span class="text-[11px] font-bold mt-1 ${item.textColor}">${item.label}</span>
-            <span class="text-[9px] text-emerald-400 font-bold">✨ Обрано</span>
+            <span class="text-[9px] text-amber-300 font-bold">Lv ${lvl} ✨</span>
           `;
         } else {
           // Unlocked dragon, ready to switch
+          const lvl = dragonLevels[item.key] || 1;
           btn.className = `element-btn border border-slate-700 bg-slate-900/60 hover:bg-slate-800/60 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all duration-200 opacity-80 hover:opacity-100 cursor-pointer active:scale-95`;
           btn.innerHTML = `
             <span class="text-lg">${item.icon}</span>
             <span class="text-[11px] font-bold mt-1 text-slate-200">${item.label}</span>
-            <span class="text-[9px] text-amber-300/80 font-medium">Відкрито</span>
+            <span class="text-[9px] text-emerald-400 font-bold">Lv ${lvl}</span>
           `;
         }
       });
@@ -13228,6 +13297,8 @@
       }
 
       currentElement = elem;
+      switchActiveDragon(elem);
+      syncActiveDragonStats();
       updateElementButtonsUI();
 
       const cfg = elementsConfig[elem];
@@ -13240,10 +13311,9 @@
         stormInspector.style.display = (elem === 'storm') ? 'block' : 'none';
       }
 
-      // Switch to the unique 3D model without recoloring
-      switchActiveDragon(elem);
       applyDragonNameUI();
       updateStageVisual();
+      syncWithServer();
 
       // If switching to an unlocked dragon that hasn't been given a personal name yet, prompt player!
       if (!hasCurrentDragonBeenNamed(elem)) {
@@ -13276,22 +13346,22 @@
 
     function onLevelChange(val) {
       const newLvl = parseInt(val);
+      if (!activeDragonKey) return;
       const isHatching = (currentLevel <= 9 && newLvl >= 10);
       prevLevel = currentLevel;
       currentLevel = newLvl;
-      document.getElementById('currentLevelBadge').innerText = `Lv ${currentLevel}`;
-      
+      dragonLevels[activeDragonKey] = currentLevel;
+      dragonXP[activeDragonKey] = 0;
+      currentXP = 0;
       maxXP = Math.round(50 * Math.pow(currentLevel, 1.32));
-      currentXP = 0; // Starts at 0 XP for each level!
-      document.getElementById('xpText').innerText = `0 / ${maxXP} XP`;
-      document.getElementById('xpBar').style.width = `0%`;
-      document.getElementById('xpRequiredBadge').innerText = `${maxXP} XP`;
 
-      const power = Math.round(10 + Math.pow(currentLevel, 1.55));
-      document.getElementById('statPower').innerText = `${power} ⚔️`;
-      document.getElementById('levelDetailText').innerText = getLevelLore(currentLevel);
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('dragon_xp', JSON.stringify(dragonXP));
 
+      syncActiveDragonStats();
       updateStageVisual();
+      updateElementButtonsUI();
+      syncWithServer();
 
       if (isHatching) {
         playAction('Birth', true, () => {
@@ -13300,29 +13370,35 @@
       }
     }
 
-    // Unified XP Progression: When XP reaches maxXP, level increases and XP resets to 0!
+    // Unified XP Progression: Levels up ONLY the active dragon!
     function addXP(amount) {
+      if (!unlockedElements || unlockedElements.length === 0 || !activeDragonKey) return;
+      currentLevel = dragonLevels[activeDragonKey] || 1;
+      currentXP = dragonXP[activeDragonKey] || 0;
+      maxXP = Math.round(50 * Math.pow(currentLevel, 1.32));
+
       currentXP += amount;
-      if (currentXP >= maxXP) {
-        while (currentXP >= maxXP && currentLevel < 100) {
-          currentLevel++;
-          currentXP = 0; // XP resets to 0 upon level up!
-          maxXP = Math.round(50 * Math.pow(currentLevel, 1.32));
-        }
+      let leveledUp = false;
 
-        const levelSlider = document.getElementById('levelSlider');
-        if (levelSlider) levelSlider.value = currentLevel;
+      while (currentXP >= maxXP && currentLevel < 100) {
+        currentLevel++;
+        currentXP = 0; // XP resets upon level up!
+        maxXP = Math.round(50 * Math.pow(currentLevel, 1.32));
+        leveledUp = true;
+      }
 
-        const badge = document.getElementById('currentLevelBadge');
-        if (badge) badge.innerText = `Lv ${currentLevel}`;
+      dragonLevels[activeDragonKey] = currentLevel;
+      dragonXP[activeDragonKey] = currentXP;
 
-        document.getElementById('xpRequiredBadge').innerText = `${maxXP} XP`;
-        const power = Math.round(10 + Math.pow(currentLevel, 1.55));
-        document.getElementById('statPower').innerText = `${power} ⚔️`;
-        document.getElementById('levelDetailText').innerText = getLevelLore(currentLevel);
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('dragon_xp', JSON.stringify(dragonXP));
 
-        updateStageVisual();
+      syncActiveDragonStats();
+      updateStageVisual();
+      updateElementButtonsUI();
+      syncWithServer();
 
+      if (leveledUp) {
         if (prevLevel <= 9 && currentLevel >= 10) {
           playAction('Birth', true, () => {
             playAction(getIdleActionName(), false, null, true);
@@ -13330,14 +13406,12 @@
         }
         prevLevel = currentLevel;
 
-        showNotice(`🎉 РІВЕНЬ ПІДВИЩЕНО! Дракон виріс до Рівня ${currentLevel}! (XP: 0 / ${maxXP})`);
+        const dName = getCurrentDragonName();
+        showNotice(`🎉 РІВЕНЬ ПІДВИЩЕНО! Дракон «${dName}» виріс до Рівня ${currentLevel}! (XP: 0 / ${maxXP})`);
         if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
           Telegram.WebApp.HapticFeedback.notificationOccurred('success');
         }
       }
-
-      document.getElementById('xpText').innerText = `${currentXP} / ${maxXP} XP`;
-      document.getElementById('xpBar').style.width = `${Math.min(100, (currentXP / maxXP) * 100)}%`;
     }
 
     function updateStageVisual() {
@@ -13350,6 +13424,10 @@
       const activeEntry = dragonsCache[activeDragonKey];
 
       // Ensure ALL cached dragons strictly adhere to current level and active element
+      if (typeof update360EnvVisibility === 'function') {
+        update360EnvVisibility();
+      }
+
       Object.keys(dragonsCache).forEach(k => {
         if (dragonsCache[k] && dragonsCache[k].model) {
           dragonsCache[k].model.visible = (currentLevel >= 10 && k === activeDragonKey);
@@ -14323,6 +14401,12 @@
           if (data.named_dragons) {
             try { Object.assign(namedDragons, JSON.parse(data.named_dragons)); } catch(e){}
           }
+          if (data.dragon_levels) {
+            try { Object.assign(dragonLevels, JSON.parse(data.dragon_levels)); } catch(e){}
+          }
+          if (data.dragon_xp) {
+            try { Object.assign(dragonXP, JSON.parse(data.dragon_xp)); } catch(e){}
+          }
 
           updateCurrencyUI();
           updateElementButtonsUI();
@@ -14349,7 +14433,9 @@
             active_element: currentElement,
             unlocked_elements: unlockedElements,
             dragon_names: dragonNames,
-            named_dragons: namedDragons
+            named_dragons: namedDragons,
+            dragon_levels: dragonLevels,
+            dragon_xp: dragonXP
           })
         }).catch(e => console.log('Sync error:', e));
       } catch (e) {}

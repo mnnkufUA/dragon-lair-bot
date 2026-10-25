@@ -188,6 +188,16 @@ async def cmd_profile(message: types.Message):
     else:
         active_str = "🔒 Ще немає (Лігво спить)"
 
+    dragons_detail = ""
+    if unlocked:
+        dragons_detail = "\n🐉 **Рівні ваших драконів:**\n"
+        for el in unlocked:
+            el_icon = elem_icons.get(el, '🐉')
+            el_name = names.get(el, el.capitalize())
+            el_lvl = levels.get(el, 1)
+            marker = " *(активний)*" if el == active else ""
+            dragons_detail += f"• {el_icon} {el_name}: **Рівень {el_lvl}**{marker}\n"
+
     text = (
         f"👤 **Профіль володаря драконів:**\n\n"
         f"🪙 Монети: **{user['coins']}**\n"
@@ -196,6 +206,7 @@ async def cmd_profile(message: types.Message):
         f"🥚 Драконячі яйця: **{user['eggs']} шт**\n\n"
         f"🐉 **Активний дракон:** {active_str}\n"
         f"🔓 Відкрито стихій: **{len(unlocked)} / 4**\n"
+        f"{dragons_detail}"
     )
     await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
