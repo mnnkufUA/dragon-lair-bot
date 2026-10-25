@@ -7,7 +7,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-domain.onrender.com")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://dragon-lair-bot.onrender.com")
+TG_APP_URL = os.getenv("TG_APP_URL", "https://t.me/MyDragonLair_bot/app")
 
 dp = Dispatcher()
 
@@ -15,7 +16,7 @@ def get_main_keyboard(is_group: bool = False):
     # Telegram strictly forbids 'web_app' inline buttons in groups!
     # In groups we send standard url= link, in private chat we send web_app=
     if is_group:
-        lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=WEBAPP_URL)
+        lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=TG_APP_URL)
     else:
         lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=WEBAPP_URL))
 
@@ -142,7 +143,7 @@ async def cmd_lair(message: types.Message):
             return
 
         if is_group:
-            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=WEBAPP_URL)
+            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=TG_APP_URL)
         else:
             open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=WEBAPP_URL))
 
