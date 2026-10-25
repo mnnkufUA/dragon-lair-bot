@@ -6,11 +6,15 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://dragon-lair-bot.onrender.com")
-TG_APP_URL = os.getenv("TG_APP_URL", "https://t.me/MyDragonLair_bot/app")
+from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL
+from handlers.bomb_handlers import router as bomb_router, cmd_bomb
+from handlers.hunt_handlers import router as hunt_router, cmd_hunt
+from handlers.cities_handlers import router as cities_router, cmd_cities
 
 dp = Dispatcher()
+dp.include_router(bomb_router)
+dp.include_router(hunt_router)
+dp.include_router(cities_router)
 
 def get_main_keyboard(is_group: bool = False):
     # Telegram strictly forbids 'web_app' inline buttons in groups!
@@ -50,8 +54,11 @@ async def setup_bot_commands(bot: Bot):
         BotCommand(command="profile", description="Профіль та рівні драконів"),
         BotCommand(command="profildragon", description="Особистий профіль"),
         BotCommand(command="roulette", description="🎰 Рулетка драконячих яєць"),
-        BotCommand(command="bomb", description="💣 Гра «Бомба»"),
-        BotCommand(command="movie", description="🎬 Гра «Вгадай фільм»"),
+        BotCommand(command="bomb", description="💣 Гра «Бомба» (слова та склади)"),
+        BotCommand(command="movie", description="🎬 Гра «Вгадай фільм / гру»"),
+        BotCommand(command="cities", description="🏛️ Гра «Міста Дракона»"),
+        BotCommand(command="stop_bomb", description="🛑 Зупинити раунд Бомби"),
+        BotCommand(command="stop_cities", description="🛑 Зупинити гру в Міста"),
     ]
     try:
         await bot.set_my_commands(commands)
@@ -105,11 +112,12 @@ async def cmd_start(message: types.Message):
 
         welcome_text += (
             "🎮 **Швидкі команди:**\n"
-            "• `/bomb` або `!бомба` — Гра «Бомба» (монети, смаколики та яйця!)\n"
-            "• `/movie` або `!фільм` — Гра «Вгадай фільм»\n"
+            "• `/bomb` або `!бомба` — Гра «Бомба» (слова, склади, монети, їжа та яйця!)\n"
+            "• `/movie` або `!фільм` — Гра «Вгадай фільм / гру» (постери та дешифровка)\n"
+            "• `/cities` або `!міста` — Гра «Міста Дракона» (географічна битва)\n"
             "• `/roulette` або `!рулетка` — Крутити рулетку яєць\n"
-            "• `/lair` або `!моєлігво` — Відкрити Лігво\n"
-            "• `/profile` або `/profildragon` — Профіль драконів"
+            "• `/lair` або `!моєлігво` — Відкрити 3D Лігво Дракона\n"
+            "• `/profile` — Особистий профіль володаря драконів"
         )
 
         is_group = message.chat.type in ["group", "supergroup"]
@@ -224,66 +232,6 @@ async def cmd_roulette(message: types.Message):
     except Exception as e:
         print("cmd_roulette error:", e)
 
-BOMB_COMMANDS = ["bomb", "bombgame", "bombdragon", "бомба", "гра_бомба"]
-BOMB_TRIGGERS = ["!бомба", "бомба", "!гра бомба", "гра бомба", "!bomb", "bomb"]
-
-@dp.message(Command(*BOMB_COMMANDS))
-@dp.message(F.text.func(lambda text: is_text_trigger(text, BOMB_TRIGGERS)))
-async def cmd_bomb(message: types.Message):
-    try:
-        uid = message.from_user.id if message.from_user else message.chat.id
-        uname = (message.from_user.username or "") if message.from_user else ""
-        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
-
-        user = await get_or_create_user(uid, uname, fname)
-        is_group = message.chat.type in ["group", "supergroup"]
-
-        coins = random.randint(15, 20)
-        food = 1 if random.random() < 0.20 else 0
-        egg = 1 if random.random() < 0.10 else 0
-
-        await add_game_rewards(user['user_id'], coins=coins, food=food, eggs=egg)
-
-        msg = f"💣 **Перемога в грі «Бомба»!**\nВи вчасно знешкодили вибухівку й отримали: **+{coins} 🪙 Монет**"
-        if food > 0:
-            msg += "\n🍖 **+1 смаколик** (випав з 20% шансом)!"
-        if egg > 0:
-            msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `/roulette` або `!рулетка`, щоб відкрити дракона!"
-
-        await message.answer(msg, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
-    except Exception as e:
-        print("cmd_bomb error:", e)
-
-MOVIE_COMMANDS = ["movie", "moviegame", "moviedragon", "фільм", "вгадай_фільм"]
-MOVIE_TRIGGERS = ["!фільм", "фільм", "!вгадай фільм", "вгадай фільм", "!movie", "movie"]
-
-@dp.message(Command(*MOVIE_COMMANDS))
-@dp.message(F.text.func(lambda text: is_text_trigger(text, MOVIE_TRIGGERS)))
-async def cmd_movie(message: types.Message):
-    try:
-        uid = message.from_user.id if message.from_user else message.chat.id
-        uname = (message.from_user.username or "") if message.from_user else ""
-        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
-
-        user = await get_or_create_user(uid, uname, fname)
-        is_group = message.chat.type in ["group", "supergroup"]
-
-        coins = random.randint(15, 20)
-        food = 1 if random.random() < 0.20 else 0
-        egg = 1 if random.random() < 0.10 else 0
-
-        await add_game_rewards(user['user_id'], coins=coins, food=food, eggs=egg)
-
-        msg = f"🎬 **«Вгадай фільм» пройдено успішно!**\nВідмінна ерудиція: **+{coins} 🪙 Монет**"
-        if food > 0:
-            msg += "\n🍖 **+1 смаколик** (випав з 20% шансом)!"
-        if egg > 0:
-            msg += "\n🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\nЗапустіть команду `/roulette` або `!рулетка`, щоб відкрити дракона!"
-
-        await message.answer(msg, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
-    except Exception as e:
-        print("cmd_movie error:", e)
-
 PROFILE_COMMANDS = ["profile", "profildragon", "profiledragon", "dragonprofile", "профіль", "профиль"]
 PROFILE_TRIGGERS = ["!профіль", "профіль", "!профиль", "профиль", "!profildragon", "!profile", "profildragon", "profile"]
 
@@ -360,7 +308,7 @@ async def cb_bomb(query: types.CallbackQuery):
 @dp.callback_query(F.data == "play_movie")
 async def cb_movie(query: types.CallbackQuery):
     await query.answer()
-    await cmd_movie(query.message)
+    await cmd_hunt(query.message)
 
 @dp.callback_query(F.data == "play_roulette")
 async def cb_roulette(query: types.CallbackQuery):

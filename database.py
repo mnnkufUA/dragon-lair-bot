@@ -123,3 +123,47 @@ def _add_game_rewards_sync(user_id: int, coins: int, food: int, eggs: int):
 
 async def add_game_rewards(user_id: int, coins: int, food: int, eggs: int):
     await asyncio.to_thread(_add_game_rewards_sync, user_id, coins, food, eggs)
+
+def _try_deduct_coins_sync(user_id: int, amount: int) -> bool:
+    if amount <= 0:
+        return True
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT coins FROM users WHERE user_id = ?", (user_id,))
+        row = cur.fetchone()
+        if not row or row["coins"] < amount:
+            return False
+        cur.execute("UPDATE users SET coins = coins - ? WHERE user_id = ?", (amount, user_id))
+        conn.commit()
+        return True
+
+async def try_deduct_coins(user_id: int, amount: int) -> bool:
+    return await asyncio.to_thread(_try_deduct_coins_sync, user_id, amount)
+
+def _add_coins_sync(user_id: int, amount: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("UPDATE users SET coins = coins + ? WHERE user_id = ?", (amount, user_id))
+        conn.commit()
+
+async def add_coins(user_id: int, amount: int):
+    await asyncio.to_thread(_add_coins_sync, user_id, amount)
+
+async def award_game_win(user_id: int, coins: int, username: str = "", first_name: str = "") -> dict:
+    import random
+    await get_or_create_user(user_id, username, first_name)
+    food = 1 if random.random() < 0.20 else 0
+    egg = 1 if random.random() < 0.10 else 0
+    await add_game_rewards(user_id, coins=coins, food=food, eggs=egg)
+    return {"coins": coins, "food": food, "egg": egg}
+
+async def record_bomb_win(user_id: int, prize: int):
+    return await award_game_win(user_id, coins=prize)
+
+async def record_hunt_win(user_id: int, prize: int):
+    return await award_game_win(user_id, coins=prize)
+
+async def record_cities_win(user_id: int, prize: int):
+    return await award_game_win(user_id, coins=prize)
+
+
