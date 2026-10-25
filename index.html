@@ -14361,6 +14361,10 @@
             try { Object.assign(dragonXP, JSON.parse(data.dragon_xp)); } catch(e){}
           }
 
+          if (unlockedElements && unlockedElements.length > 0) {
+            activeDragonKey = currentElement || unlockedElements[0];
+          }
+          syncActiveDragonStats();
           checkEmptyLairState();
           updateCurrencyUI();
           updateElementButtonsUI();
@@ -14526,16 +14530,47 @@
       showNotice("🔒 Ви вийшли з Адмін-панелі.");
     }
 
-    function adminUnlockAllDragons() {
+    function adminUnlockAllDragons(hatched = true) {
       unlockedElements = ['fire', 'storm', 'frost', 'jade'];
-      if (!activeDragonKey) activeDragonKey = 'fire';
+      activeDragonKey = 'fire';
+      currentElement = 'fire';
+      if (!dragonLevels) dragonLevels = {};
+      ['fire', 'storm', 'frost', 'jade'].forEach(k => {
+        if (hatched) {
+          if (!dragonLevels[k] || dragonLevels[k] < 15) {
+            dragonLevels[k] = 15;
+          }
+        } else {
+          dragonLevels[k] = 1;
+        }
+      });
+      currentLevel = dragonLevels['fire'] || (hatched ? 15 : 1);
       safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
-      updateElementButtonsUI();
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      updateCurrencyUI();
       checkEmptyLairState();
       setElement('fire');
+      syncActiveDragonStats();
       updateStageVisual();
       syncWithServer();
-      showNotice("🔓 Всі 4 стихії розблоковано!");
+      const statusText = hatched ? "на Lv 15 (Дорослі бойові дракони)" : "на Lv 1 (Яйця)";
+      showNotice(`🔓 Всі 4 стихії розблоковано ${statusText}! Перемикайте їх внизу.`);
+    }
+
+    function adminAddLevelsToActive(levelsToAdd = 10) {
+      if (!activeDragonKey) activeDragonKey = 'fire';
+      if (!dragonLevels) dragonLevels = {};
+      const cur = dragonLevels[activeDragonKey] || 1;
+      const nextLvl = Math.min(100, cur + levelsToAdd);
+      dragonLevels[activeDragonKey] = nextLvl;
+      currentLevel = nextLvl;
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      syncActiveDragonStats();
+      checkEmptyLairState();
+      updateStageVisual();
+      updateElementButtonsUI();
+      syncWithServer();
+      showNotice(`🆙 Дракону (${activeDragonKey}) додано +${levelsToAdd} рівнів! (Зараз: Lv ${nextLvl})`);
     }
 
     function adminResetProfileToZero() {
@@ -14780,15 +14815,20 @@
             <span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-bold border border-amber-500/30">Миттєво</span>
           </div>
 
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="adminUnlockAllDragons()" class="bg-gradient-to-r from-emerald-950/70 to-teal-900/60 hover:from-emerald-900/80 hover:to-teal-800/70 border border-emerald-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
-              <span class="text-xs font-bold text-emerald-200 block">🔓 Відкрити всі 4 стихії</span>
-              <span class="text-[9px] text-emerald-400/80">Вогонь, Шторм, Лід, Нефрит</span>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="adminUnlockAllDragons(true)" class="bg-gradient-to-r from-emerald-950/70 to-teal-900/60 hover:from-emerald-900/80 hover:to-teal-800/70 border border-emerald-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
+              <span class="text-xs font-bold text-emerald-200 block">🔓 Всі 4 (Lv 15)</span>
+              <span class="text-[9px] text-emerald-400/80">Всі 3D дракони</span>
+            </button>
+
+            <button onclick="adminAddLevelsToActive(10)" class="bg-gradient-to-r from-amber-950/70 to-orange-900/60 hover:from-amber-900/80 hover:to-orange-800/70 border border-amber-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
+              <span class="text-xs font-bold text-amber-200 block">🆙 +10 Рівнів</span>
+              <span class="text-[9px] text-amber-400/80">Прокачати дракона</span>
             </button>
 
             <button onclick="adminResetProfileToZero()" class="bg-gradient-to-r from-red-950/70 to-rose-900/60 hover:from-red-900/80 hover:to-rose-800/70 border border-red-500/50 p-2 rounded-xl text-left transition-all active:scale-95">
-              <span class="text-xs font-bold text-rose-200 block">🔄 Скинути профіль до 0</span>
-              <span class="text-[9px] text-rose-400/80">0 валют, 0 драконів (New User)</span>
+              <span class="text-xs font-bold text-rose-200 block">🔄 Скинути до 0</span>
+              <span class="text-[9px] text-rose-400/80">0 валют, 0 драконів</span>
             </button>
           </div>
 
