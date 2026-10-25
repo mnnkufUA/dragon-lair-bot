@@ -8665,12 +8665,12 @@
       <!-- Top Stage Title -->
       <div class="relative z-20 text-center space-y-1 mb-1 pointer-events-none">
         <div class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-slate-900/90 border border-slate-700/70 shadow-md backdrop-blur-md">
-          <span id="stageIcon" class="text-sm">🥚</span>
-          <span id="stageTitle" class="text-xs font-bold text-slate-200">Рівень 1: Магічне Драконяче Яйце</span>
+          <span id="stageIcon" class="text-sm">🔒</span>
+          <span id="stageTitle" class="text-xs font-bold text-slate-200">Лігво ще спить</span>
         </div>
         <div class="flex items-center justify-center gap-2 pointer-events-auto">
           <h2 id="petName" class="text-2xl font-black tracking-wide text-white drop-shadow">
-            Спаркі
+            Порожньо
           </h2>
           <button onclick="openRenameModal()" class="px-2 py-0.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/90 border border-slate-600/80 text-[11px] font-bold text-cyan-300 flex items-center gap-1 shadow transition-all hover:scale-105 active:scale-95" title="Змінити ім'я за 15 💧 Сліз Дракона">
             <span>✏️</span>
@@ -8684,7 +8684,7 @@
         <canvas id="webglCanvas" class="w-full h-full block outline-none select-none"></canvas>
 
         <!-- EMPTY LAIR OVERLAY (When 0 dragons unlocked) -->
-        <div id="emptyLairOverlay" class="absolute inset-0 z-30 bg-[#0a0d16]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4" style="display: none;">
+        <div id="emptyLairOverlay" class="absolute inset-0 z-30 bg-[#0a0d16]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4" style="display: flex;">
           <div class="relative">
             <div class="w-20 h-20 rounded-full bg-slate-900/90 border-2 border-dashed border-amber-500/40 flex items-center justify-center shadow-2xl shadow-amber-500/10">
               <span class="text-3xl opacity-60">🥚</span>
@@ -8772,8 +8772,7 @@
 
 
 
-    <!-- STORM ANIMATION TESTER / PREVIEWER (ONLY SHOWN FOR STORM DRAGON) -->
-    div>
+    <!-- Developer / Admin Footer Trigger -->
 
       <!-- Developer / Admin Footer Trigger -->
     <footer class="pt-6 pb-4 text-center">
@@ -14362,6 +14361,7 @@
             try { Object.assign(dragonXP, JSON.parse(data.dragon_xp)); } catch(e){}
           }
 
+          checkEmptyLairState();
           updateCurrencyUI();
           updateElementButtonsUI();
           applyDragonNameUI();
@@ -14415,6 +14415,9 @@
       const overlay = document.getElementById('emptyLairOverlay');
       if (overlay) {
         overlay.style.display = hasUnlocked ? 'none' : 'flex';
+      }
+      if (typeof eggGroup !== 'undefined' && eggGroup) {
+        eggGroup.visible = hasUnlocked ? (currentLevel <= 9) : false;
       }
       const stageTitle = document.getElementById('stageTitle');
       const petName = document.getElementById('petName');

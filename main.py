@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     if BOT_TOKEN:
         bot = Bot(token=BOT_TOKEN)
         await setup_bot_commands(bot)
-        bot_task = asyncio.create_task(dp.start_polling(bot))
+        bot_task = asyncio.create_task(dp.start_polling(bot, allowed_updates=["message", "callback_query"]))
         print("🚀 Telegram Bot polling started successfully!")
     else:
         print("⚠️ BOT_TOKEN not provided! WebApp server running only.")
