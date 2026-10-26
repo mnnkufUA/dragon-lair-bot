@@ -21,9 +21,13 @@ from config import (
 
 logger = logging.getLogger("DragonCore")
 
-# Load Ukrainian words and syllables
+# Load Ukrainian words and syllables (with multi-path fallback)
 WORDS_PATH = BASE_DIR / "data" / "words_ua.json"
+if not WORDS_PATH.exists():
+    WORDS_PATH = BASE_DIR / "words_ua.json"
 SYLLABLES_PATH = BASE_DIR / "data" / "syllables_ua.json"
+if not SYLLABLES_PATH.exists():
+    SYLLABLES_PATH = BASE_DIR / "syllables_ua.json"
 
 with open(WORDS_PATH, "r", encoding="utf-8") as f:
     ALL_WORDS: Set[str] = set(json.load(f))

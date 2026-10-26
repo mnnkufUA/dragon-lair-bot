@@ -22,7 +22,11 @@ from config import (
 logger = logging.getLogger("DragonCities")
 
 CITIES_PATH = BASE_DIR / "data" / "cities.json"
+if not CITIES_PATH.exists():
+    CITIES_PATH = BASE_DIR / "cities.json"
 BLACKLIST_PATH = BASE_DIR / "data" / "cities_blacklist.json"
+if not BLACKLIST_PATH.exists():
+    BLACKLIST_PATH = BASE_DIR / "cities_blacklist.json"
 
 with open(CITIES_PATH, "r", encoding="utf-8") as f:
     ALL_CITIES: Dict[str, str] = json.load(f)
