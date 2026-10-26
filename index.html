@@ -13266,6 +13266,7 @@
 
       applyDragonNameUI();
       updateStageVisual();
+      checkEmptyLairState();
       syncWithServer();
 
       // If switching to an unlocked dragon that hasn't been given a personal name yet, prompt player!
@@ -13716,10 +13717,18 @@
     }
 
     function quickAddCurrency(type, amount) {
-      if (type === 'sparks') sparksBalance += amount;
+      if (type === 'sparks' || type === 'coins') sparksBalance += amount;
       if (type === 'tears') dragonTearsBalance += amount;
       if (type === 'food') foodCount += amount;
+      if (type === 'eggs') eggsInventory += amount;
+
+      safeSetStorage('sparks_balance', sparksBalance);
+      safeSetStorage('dragon_tears_balance', dragonTearsBalance);
+      safeSetStorage('food_count', foodCount);
+      safeSetStorage('eggs_inventory', eggsInventory);
+
       updateCurrencyUI();
+      syncWithServer();
       showNotice(`➕ Додано +${amount} до балансу!`);
     }
 
@@ -14327,43 +14336,125 @@
     // ==========================================
     window.tgUserId = null;
     try {
-      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
-        window.tgUserId = Telegram.WebApp.initDataUnsafe.user.id;
-        console.log("Connected Telegram User ID:", window.tgUserId);
+      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
+        window.tgUserId = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
+        safeSetStorage('tg_user_id', window.tgUserId);
+        console.log("Connected Telegram User ID from initDataUnsafe:", window.tgUserId);
       }
     } catch (e) {}
 
-    async function loadCloudUserState() {
-      if (!window.tgUserId) return;
+    // Fallback 1: Telegram WebApp raw initData query string
+    if (!window.tgUserId && window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) {
       try {
+        const params = new URLSearchParams(Telegram.WebApp.initData);
+        const uStr = params.get('user');
+        if (uStr) {
+          const uObj = JSON.parse(decodeURIComponent(uStr));
+          if (uObj && uObj.id) {
+            window.tgUserId = parseInt(uObj.id, 10);
+            safeSetStorage('tg_user_id', window.tgUserId);
+            console.log("Connected Telegram User ID from initData string:", window.tgUserId);
+          }
+        }
+      } catch(e){}
+    }
+
+    // Fallback 2: URL parameter (?user_id=... or ?tg_user_id=...)
+    if (!window.tgUserId) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qId = urlParams.get('user_id') || urlParams.get('tg_user_id');
+        if (qId) {
+          window.tgUserId = parseInt(qId, 10) || qId;
+          safeSetStorage('tg_user_id', window.tgUserId);
+          console.log("Restored Telegram User ID from URL parameter:", window.tgUserId);
+        }
+      } catch (e) {}
+    }
+
+    // Fallback 3: localStorage
+    if (!window.tgUserId) {
+      const savedId = safeGetStorage('tg_user_id');
+      if (savedId && parseInt(savedId, 10) > 0) {
+        window.tgUserId = parseInt(savedId, 10) || savedId;
+        console.log("Restored Telegram User ID from localStorage:", window.tgUserId);
+      }
+    }
+
+    // Fallback 4: default test sandbox ID so sync NEVER silently fails
+    if (!window.tgUserId) {
+      window.tgUserId = 777777777;
+      console.log("Using default fallback test tgUserId:", window.tgUserId);
+    }
+
+    async function loadCloudUserState() {
+      if (!window.tgUserId) {
+        console.warn("⚠️ loadCloudUserState: window.tgUserId is null, skipping.");
+        return;
+      }
+      try {
+        console.log(`📡 [loadCloudUserState] Fetching data for user ${window.tgUserId}...`);
         const res = await fetch(`/api/user?user_id=${window.tgUserId}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn(`⚠️ [loadCloudUserState] Server returned ${res.status}`);
+          return;
+        }
         const data = await res.json();
+        console.log(`📥 [loadCloudUserState] Loaded data for user ${window.tgUserId}:`, data);
         if (data && data.user_id) {
-          sparksBalance = data.coins !== undefined ? data.coins : sparksBalance;
-          foodCount = data.food !== undefined ? data.food : foodCount;
-          eggsInventory = data.eggs !== undefined ? data.eggs : eggsInventory;
-          dragonTearsBalance = data.tears !== undefined ? data.tears : dragonTearsBalance;
+          // Keep highest value so newly cheated local coins/eggs aren't wiped by empty server defaults
+          if (data.coins !== undefined && (data.coins > 0 || sparksBalance === 0)) sparksBalance = data.coins;
+          if (data.food !== undefined && (data.food > 0 || foodCount === 0)) foodCount = data.food;
+          if (data.eggs !== undefined && (data.eggs > 0 || eggsInventory === 0)) eggsInventory = data.eggs;
+          if (data.tears !== undefined && (data.tears > 0 || dragonTearsBalance === 0)) dragonTearsBalance = data.tears;
           if (data.active_element) currentElement = data.active_element;
           if (data.unlocked_elements) {
-            try { unlockedElements = JSON.parse(data.unlocked_elements); } catch(e){}
+            try {
+              const remoteUnlocked = typeof data.unlocked_elements === 'string' ? JSON.parse(data.unlocked_elements) : data.unlocked_elements;
+              if (Array.isArray(remoteUnlocked) && remoteUnlocked.length > 0) {
+                unlockedElements = remoteUnlocked;
+              }
+            } catch(e){}
           }
           if (data.dragon_names) {
-            try { Object.assign(dragonNames, JSON.parse(data.dragon_names)); } catch(e){}
+            try {
+              const dNames = typeof data.dragon_names === 'string' ? JSON.parse(data.dragon_names) : data.dragon_names;
+              Object.assign(dragonNames, dNames);
+            } catch(e){}
           }
           if (data.named_dragons) {
-            try { Object.assign(namedDragons, JSON.parse(data.named_dragons)); } catch(e){}
+            try {
+              const nDragons = typeof data.named_dragons === 'string' ? JSON.parse(data.named_dragons) : data.named_dragons;
+              Object.assign(namedDragons, nDragons);
+            } catch(e){}
           }
           if (data.dragon_levels) {
-            try { Object.assign(dragonLevels, JSON.parse(data.dragon_levels)); } catch(e){}
+            try {
+              const dLevels = typeof data.dragon_levels === 'string' ? JSON.parse(data.dragon_levels) : data.dragon_levels;
+              Object.assign(dragonLevels, dLevels);
+            } catch(e){}
           }
           if (data.dragon_xp) {
-            try { Object.assign(dragonXP, JSON.parse(data.dragon_xp)); } catch(e){}
+            try {
+              const dXP = typeof data.dragon_xp === 'string' ? JSON.parse(data.dragon_xp) : data.dragon_xp;
+              Object.assign(dragonXP, dXP);
+            } catch(e){}
           }
 
           if (unlockedElements && unlockedElements.length > 0) {
-            activeDragonKey = currentElement || unlockedElements[0];
+            if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
+              activeDragonKey = currentElement || unlockedElements[0] || 'fire';
+            }
           }
+
+          safeSetStorage('sparks_balance', sparksBalance);
+          safeSetStorage('food_count', foodCount);
+          safeSetStorage('eggs_inventory', eggsInventory);
+          safeSetStorage('dragon_tears_balance', dragonTearsBalance);
+          safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
+          safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+          safeSetStorage('active_dragon_key', activeDragonKey);
+
           syncActiveDragonStats();
           checkEmptyLairState();
           updateCurrencyUI();
@@ -14372,31 +14463,47 @@
           updateStageVisual();
         }
       } catch (err) {
-        console.log("Cloud user state load error:", err);
+        console.error("❌ [loadCloudUserState] Cloud user state load error:", err);
       }
     }
 
     function syncWithServer() {
-      if (!window.tgUserId) return;
+      if (!window.tgUserId) {
+        console.warn("⚠️ [syncWithServer] window.tgUserId is null, skipping sync.");
+        return;
+      }
+      const payload = {
+        user_id: window.tgUserId,
+        coins: sparksBalance,
+        food: foodCount,
+        eggs: eggsInventory,
+        tears: dragonTearsBalance,
+        active_element: currentElement,
+        unlocked_elements: unlockedElements,
+        dragon_names: dragonNames,
+        named_dragons: namedDragons,
+        dragon_levels: dragonLevels,
+        dragon_xp: dragonXP
+      };
       try {
         fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: window.tgUserId,
-            coins: sparksBalance,
-            food: foodCount,
-            eggs: eggsInventory,
-            tears: dragonTearsBalance,
-            active_element: currentElement,
-            unlocked_elements: unlockedElements,
-            dragon_names: dragonNames,
-            named_dragons: namedDragons,
-            dragon_levels: dragonLevels,
-            dragon_xp: dragonXP
-          })
-        }).catch(e => console.log('Sync error:', e));
-      } catch (e) {}
+          body: JSON.stringify(payload)
+        })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          console.log(`✅ [syncWithServer] Saved successfully for user ${window.tgUserId}:`, data);
+        })
+        .catch(err => {
+          console.error(`❌ [syncWithServer] Sync error for user ${window.tgUserId}:`, err);
+        });
+      } catch (e) {
+        console.error("❌ [syncWithServer] Exception during sync:", e);
+      }
     }
 
     // Load cloud state on init
@@ -14415,7 +14522,13 @@
     }
 
     function checkEmptyLairState() {
-      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
+      if (unlockedElements && unlockedElements.length > 0) {
+        if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
+          activeDragonKey = unlockedElements[0] || 'fire';
+        }
+        currentElement = activeDragonKey;
+      }
+      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && !!activeDragonKey);
       const overlay = document.getElementById('emptyLairOverlay');
       if (overlay) {
         overlay.style.display = hasUnlocked ? 'none' : 'flex';
@@ -14444,6 +14557,12 @@
         if (feedBtn) { feedBtn.style.opacity = '1.0'; feedBtn.style.cursor = 'pointer'; }
         if (trainBtn) { trainBtn.style.opacity = '1.0'; trainBtn.style.cursor = 'pointer'; }
         if (expeditionBtn) { expeditionBtn.style.opacity = '1.0'; expeditionBtn.style.cursor = 'pointer'; }
+        if (petName) {
+          petName.innerText = (typeof getCurrentDragonName === 'function') ? getCurrentDragonName() : (dragonNames[activeDragonKey] || 'Дракон');
+        }
+        if (stageTitle && (stageTitle.innerText === 'Лігво ще спить' || stageTitle.innerText === 'Порожньо')) {
+          stageTitle.innerText = (typeof getStageName === 'function') ? getStageName(currentLevel) : 'Дорослий Дракон';
+        }
       }
       updateCooldownTimers();
       update360EnvVisibility();
@@ -14516,7 +14635,51 @@
       if (modal) {
         modal.style.display = 'flex';
         modal.style.zIndex = '99999';
+        const input = document.getElementById('adminTgUserIdInput');
+        if (input) {
+          input.value = (window.tgUserId && window.tgUserId !== 777777777) ? window.tgUserId : '';
+        }
+        updateAdminIdBanner();
       }
+    }
+
+    function updateAdminIdBanner() {
+      const statusEl = document.getElementById('adminTgUserStatus');
+      const hintEl = document.getElementById('adminTgUserHint');
+      const isTest = (!window.tgUserId || window.tgUserId === 777777777);
+      if (statusEl) {
+        if (isTest) {
+          statusEl.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40";
+          statusEl.innerText = "ТЕСТОВИЙ (777777777)";
+        } else {
+          statusEl.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40";
+          statusEl.innerText = `ПРИВ'ЯЗАНО: ${window.tgUserId}`;
+        }
+      }
+      if (hintEl) {
+        if (isTest) {
+          hintEl.innerHTML = `⚠️ <strong class="text-amber-300">Зараз активний тестовий ID (777777777)!</strong> Бот у Telegram не бачить цей баланс.<br>Введіть ваш числовий Telegram ID (команда <code>/myid</code> у боті) та натисніть «💾 Зберегти ID», щоб накручені ресурси та яйця миттєво з'явилися у боті!`;
+        } else {
+          hintEl.innerHTML = `✅ <strong class="text-emerald-300">Синхронізація з ботом активна!</strong> Всі накручені ресурси автоматично зберігаються на ваш обліковий запис Telegram (${window.tgUserId}).`;
+        }
+      }
+    }
+
+    function adminBindTgUserId() {
+      const input = document.getElementById('adminTgUserIdInput');
+      if (!input) return;
+      const val = parseInt(input.value.trim(), 10);
+      if (!val || isNaN(val) || val <= 0) {
+        showNotice("⚠️ Введіть коректний числовий ID! Напишіть боту /myid щоб дізнатися його.");
+        return;
+      }
+      window.tgUserId = val;
+      safeSetStorage('tg_user_id', val);
+      updateAdminIdBanner();
+      
+      // CRITICAL: Immediately push current local balance, eggs, and dragons to server for this user ID!
+      syncWithServer();
+      showNotice(`✅ Telegram ID ${val} успішно прив'язано! На баланс збережено: ${eggsInventory} 🥚 яєць, ${sparksBalance} 🪙 монет та відкритих драконів.`);
     }
 
     function closeAdminDashboard() {
@@ -14536,25 +14699,30 @@
       currentElement = 'fire';
       if (!dragonLevels) dragonLevels = {};
       ['fire', 'storm', 'frost', 'jade'].forEach(k => {
-        if (hatched) {
-          if (!dragonLevels[k] || dragonLevels[k] < 15) {
-            dragonLevels[k] = 15;
-          }
-        } else {
-          dragonLevels[k] = 1;
-        }
+        dragonLevels[k] = hatched ? 15 : 1;
       });
       currentLevel = dragonLevels['fire'] || (hatched ? 15 : 1);
+
       safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
       safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('active_dragon_key', activeDragonKey);
+
+      // 1. Immediately hide the empty lair overlay
+      const overlay = document.getElementById('emptyLairOverlay');
+      if (overlay) overlay.style.display = 'none';
+
+      // 2. Immediately update the element buttons UI so "🔒 Закрито" is replaced with "Lv 15 ✨"
+      updateElementButtonsUI();
       updateCurrencyUI();
-      checkEmptyLairState();
       setElement('fire');
       syncActiveDragonStats();
+      applyDragonNameUI();
       updateStageVisual();
+      checkEmptyLairState();
       syncWithServer();
+
       const statusText = hatched ? "на Lv 15 (Дорослі бойові дракони)" : "на Lv 1 (Яйця)";
-      showNotice(`🔓 Всі 4 стихії розблоковано ${statusText}! Перемикайте їх внизу.`);
+      showNotice(`🔓 Всі 4 стихії розблоковано ${statusText}! Кнопки зверху активні.`);
     }
 
     function adminAddLevelsToActive(levelsToAdd = 10) {
@@ -14603,6 +14771,7 @@
 
     function adminAddEggs(count) {
       eggsInventory += count;
+      safeSetStorage('eggs_inventory', eggsInventory);
       updateCurrencyUI();
       syncWithServer();
       showNotice(`🥚 Додано +${count} драконячих яєць!`);
@@ -14806,6 +14975,28 @@
       <!-- Modal Body (Scrollable) -->
       <div class="p-4 overflow-y-auto space-y-4">
         
+        <!-- SECTION 0: TELEGRAM USER ID BINDING -->
+        <div class="bg-slate-950/90 border border-blue-500/50 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🆔</span> Синхронізація з Telegram-ботом
+            </span>
+            <span id="adminTgUserStatus" class="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-200 font-bold border border-blue-500/30">ID: --</span>
+          </div>
+
+          <div id="adminTgUserHint" class="text-[11px] text-slate-300 bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 leading-relaxed">
+            Введіть свій числовий ID з Telegram (напишіть боту команду <code class="text-amber-300 font-mono font-bold">/myid</code>), щоб усі накручені ресурси збереглися на ваш акаунт.
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input type="number" id="adminTgUserIdInput" placeholder="Введіть числовий Telegram ID..." class="flex-1 bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-xl px-3 py-2 text-xs text-white font-mono outline-none">
+            <button onclick="adminBindTgUserId()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5">
+              <span>💾</span>
+              <span>Зберегти ID</span>
+            </button>
+          </div>
+        </div>
+
         <!-- SECTION 1: GOD MODE & BALANCE CHEATS -->
         <div class="bg-gradient-to-br from-amber-950/30 to-purple-950/30 border border-amber-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
           <div class="flex items-center justify-between">
@@ -14833,17 +15024,26 @@
           </div>
 
           <div class="grid grid-cols-4 gap-1.5 pt-1">
-            <button onclick="quickAddCurrency('sparks', 500)" class="bg-slate-900 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
-              +500 🪙
+            <button onclick="quickAddCurrency('sparks', 1000)" class="bg-slate-900 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +1 000 🪙
             </button>
-            <button onclick="quickAddCurrency('tears', 50)" class="bg-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
-              +50 💧
+            <button onclick="quickAddCurrency('sparks', 10000)" class="bg-slate-900 border border-amber-500/40 hover:border-amber-400 text-amber-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +10 000 🪙
             </button>
-            <button onclick="quickAddCurrency('food', 20)" class="bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
-              +20 🍖
+            <button onclick="adminAddEggs(10)" class="bg-slate-900 border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +10 🥚
             </button>
-            <button onclick="adminAddEggs(5)" class="bg-slate-900 border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
-              +5 🥚
+            <button onclick="adminAddEggs(50)" class="bg-slate-900 border border-purple-500/40 hover:border-purple-400 text-purple-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +50 🥚
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1.5">
+            <button onclick="quickAddCurrency('food', 50)" class="bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +50 🍖 Смаколиків
+            </button>
+            <button onclick="quickAddCurrency('tears', 100)" class="bg-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[11px] font-bold py-1.5 rounded-lg active:scale-95">
+              +100 💧 Сліз дракона
             </button>
           </div>
         </div>

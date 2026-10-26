@@ -7,22 +7,34 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
 from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL
-from handlers.bomb_handlers import router as bomb_router, cmd_bomb
-from handlers.hunt_handlers import router as hunt_router, cmd_hunt
-from handlers.cities_handlers import router as cities_router, cmd_cities
+try:
+    from handlers.bomb_handlers import router as bomb_router, cmd_bomb
+except ImportError:
+    from bomb_handlers import router as bomb_router, cmd_bomb
+
+try:
+    from handlers.hunt_handlers import router as hunt_router, cmd_hunt
+except ImportError:
+    from hunt_handlers import router as hunt_router, cmd_hunt
+
+try:
+    from handlers.cities_handlers import router as cities_router, cmd_cities
+except ImportError:
+    from cities_handlers import router as cities_router, cmd_cities
 
 dp = Dispatcher()
 dp.include_router(bomb_router)
 dp.include_router(hunt_router)
 dp.include_router(cities_router)
 
-def get_main_keyboard(is_group: bool = False):
+def get_main_keyboard(is_group: bool = False, user_id: int = None):
     # Telegram strictly forbids 'web_app' inline buttons in groups!
     # In groups we send standard url= link, in private chat we send web_app=
     if is_group:
         lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=TG_APP_URL)
     else:
-        lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=WEBAPP_URL))
+        url = f"{WEBAPP_URL}?user_id={user_id}" if user_id else WEBAPP_URL
+        lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=url))
 
     return InlineKeyboardMarkup(inline_keyboard=[
         [lair_btn],
@@ -67,6 +79,26 @@ async def setup_bot_commands(bot: Bot):
 
 START_COMMANDS = ["start", "startdragon", "dragonstart", "start_dragon"]
 
+
+# --- USER ID DISCOVERY COMMAND ---
+MYID_COMMANDS = ["myid", "id", "айди", "мойайди"]
+MYID_TRIGGERS = ["!id", "!айди", "айди", "id", "!myid", "мій id", "мой id", "!мійid", "!мойid"]
+
+@dp.message(Command(*MYID_COMMANDS))
+@dp.message(F.text.func(lambda text: is_text_trigger(text, MYID_TRIGGERS)))
+async def cmd_myid(message: types.Message):
+    try:
+        uid = message.from_user.id if message.from_user else message.chat.id
+        await message.answer(
+            f"🆔 **Ваш числовий Telegram ID:** `{uid}`\n\n"
+            f"💡 *(Натисніть на число вище, щоб скопіювати)*\n\n"
+            f"Введіть цей ID в Адмін-панелі веб-додатку (кнопка ⚙️ вгорі ➔ поле «Прив'язка Telegram ID» ➔ «💾 Зберегти ID»).\n"
+            f"Після цього всі накручені яйця 🥚, монети 🪙 та відкриті дракони миттєво підтягнуться до бота!",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        print("cmd_myid error:", e)
+
 @dp.message(Command(*START_COMMANDS))
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
@@ -92,7 +124,8 @@ async def cmd_start(message: types.Message):
             status_dragon = f"{elem_names.get(active, '🐉')} **«{custom_name}»**"
 
         welcome_text = (
-            f"🏰 Вітаємо у **«Лігві Дракона»**, {fname}!\n\n"
+            f"🏰 Вітаємо у **«Лігві Дракона»**, {fname}!\n"
+            f"🆔 **Ваш Telegram ID:** `{uid}`\n\n"
             f"✨ Це магічний світ, де ви зрощуєте та тренуєте живих 3D-драконів!\n\n"
             f"👛 **Ваш інвентар:**\n"
             f"🪙 Монети: **{user['coins']}**\n"
@@ -121,7 +154,7 @@ async def cmd_start(message: types.Message):
         )
 
         is_group = message.chat.type in ["group", "supergroup"]
-        await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+        await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
     except Exception as e:
         print("cmd_start error:", e)
 
@@ -146,14 +179,14 @@ async def cmd_lair(message: types.Message):
                 "У вас ще немає жодного дракона чи магічного яйця.\n"
                 "Зіграйте в `/bomb` або `/movie`, вибийте яйце та запустіть `/roulette`!",
                 parse_mode="Markdown",
-                reply_markup=get_main_keyboard(is_group=is_group)
+                reply_markup=get_main_keyboard(is_group=is_group, user_id=uid)
             )
             return
 
         if is_group:
             open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=TG_APP_URL)
         else:
-            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=WEBAPP_URL))
+            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
 
         await message.answer(
             "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити світ драконів:",
@@ -167,9 +200,10 @@ ROULETTE_TRIGGERS = ["!рулетка", "рулетка", "!рулеька", "р
 
 @dp.message(Command(*ROULETTE_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, ROULETTE_TRIGGERS)))
-async def cmd_roulette(message: types.Message):
+async def cmd_roulette(message: types.Message, user_override: types.User = None):
     try:
-        uid = message.from_user.id if message.from_user else message.chat.id
+        user_obj = user_override or message.from_user
+        uid = user_obj.id if user_obj else message.chat.id
         uname = (message.from_user.username or "") if message.from_user else ""
         fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
@@ -179,11 +213,12 @@ async def cmd_roulette(message: types.Message):
         if user['eggs'] < 1:
             await message.answer(
                 f"❌ **У вас немає яєць для рулетки!** (Потрібно 1 🥚)\n\n"
+                f"🆔 **Ваш Telegram ID:** `{uid}`\n\n"
                 f"💡 **Як отримати яйце:**\n"
-                f"• Грайте в `/bomb` або `/movie` (10% шанс вибити драконяче яйце)!\n"
-                f"• Отримуйте нагороди за активність у чаті.",
+                f"• Грайте в `/bomb`, `/movie` або `/cities` (10% шанс вибити драконяче яйце у кожній грі)!\n"
+                f"• Накрутіть яйця в Адмін-панелі гри (шестірня ⚙️), вказавши свій ID: `{uid}`!",
                 parse_mode="Markdown",
-                reply_markup=get_main_keyboard(is_group=is_group)
+                reply_markup=get_main_keyboard(is_group=is_group, user_id=uid)
             )
             return
 
@@ -228,7 +263,7 @@ async def cmd_roulette(message: types.Message):
                 f"Тепер він доступний у вашому лігві! Перейдіть у меню та познайомтеся зі своїм новим улюбленцем."
             )
 
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
     except Exception as e:
         print("cmd_roulette error:", e)
 
@@ -237,9 +272,10 @@ PROFILE_TRIGGERS = ["!профіль", "профіль", "!профиль", "п�
 
 @dp.message(Command(*PROFILE_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, PROFILE_TRIGGERS)))
-async def cmd_profile(message: types.Message):
+async def cmd_profile(message: types.Message, user_override: types.User = None):
     try:
-        uid = message.from_user.id if message.from_user else message.chat.id
+        user_obj = user_override or message.from_user
+        uid = user_obj.id if user_obj else message.chat.id
         uname = (message.from_user.username or "") if message.from_user else ""
         fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
@@ -270,7 +306,8 @@ async def cmd_profile(message: types.Message):
                 dragons_detail += f"• {el_icon} {el_name}: **Рівень {el_lvl}**{marker}\n"
 
         text = (
-            f"👤 **Профіль володаря драконів ({fname}):**\n\n"
+            f"👤 **Профіль володаря драконів ({fname}):**\n"
+            f"🆔 **Ваш Telegram ID:** `{uid}`\n\n"
             f"🪙 Монети: **{user['coins']}**\n"
             f"💧 Сльози дракона: **{user['tears']}**\n"
             f"🍖 Смаколики: **{user['food']} шт**\n"
@@ -279,7 +316,7 @@ async def cmd_profile(message: types.Message):
             f"🔓 Відкрито стихій: **{len(unlocked)} / 4**\n"
             f"{dragons_detail}"
         )
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
     except Exception as e:
         print("cmd_profile error:", e)
 
@@ -313,9 +350,11 @@ async def cb_movie(query: types.CallbackQuery):
 @dp.callback_query(F.data == "play_roulette")
 async def cb_roulette(query: types.CallbackQuery):
     await query.answer()
-    await cmd_roulette(query.message)
+    await cmd_roulette(query.message, user_override=query.from_user)
 
 @dp.callback_query(F.data == "show_profile")
 async def cb_profile(query: types.CallbackQuery):
     await query.answer()
-    await cmd_profile(query.message)
+    await cmd_profile(query.message, user_override=query.from_user)
+
+

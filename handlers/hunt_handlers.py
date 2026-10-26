@@ -1,6 +1,15 @@
+import logging
+
 from aiogram import Router, types, F
 from aiogram.filters import Command, Filter
-from games.pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
+
+try:
+    from games.pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
+except ImportError:
+    from pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
+from handlers.bomb_handlers import chat_has_game, _creating_chats
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="hunt_router")
 
@@ -12,6 +21,7 @@ class IsHuntActiveFilter(Filter):
 
 
 HUNT_TRIGGERS = {"!фільм", "фільм", "!вгадай фільм", "вгадай фільм", "!movie", "movie", "!hunt", "hunt", "!око", "око", "!зір", "зір"}
+
 
 def is_hunt_trigger(text: str) -> bool:
     if not text:
@@ -25,18 +35,36 @@ def is_hunt_trigger(text: str) -> bool:
 async def cmd_hunt(message: types.Message):
     chat_id = message.chat.id
 
-    if chat_id in active_hunt_games:
-        await message.answer("⚠️ У цьому чаті вже триває дешифровка Ока Дракона! Пишіть ваші відповіді вище.")
+    if chat_has_game(chat_id):
+        if chat_id in active_hunt_games:
+            await message.answer("⚠️ У цьому чаті вже триває дешифровка Ока Дракона! Пишіть ваші відповіді вище.")
+        else:
+            await message.answer("⚠️ У цьому чаті вже йде інша гра. Дочекайтеся її завершення.")
         return
 
-    item_meta = pick_random_hunt_item()
-    if not item_meta:
-        await message.answer("❌ Набір образів для гри порожній або не знайдений!")
-        return
+    _creating_chats.add(chat_id)
+    try:
+        try:
+            item_meta = pick_random_hunt_item()
+        except Exception:
+            logger.exception("hunt: cannot read metadata")
+            item_meta = None
+        if not item_meta:
+            await message.answer("❌ Набір образів для гри порожній або не знайдений!")
+            return
 
-    game = PixelHuntGame(chat_id=chat_id, item_meta=item_meta)
-    active_hunt_games[chat_id] = game
-    await game.start(message.bot)
+        game = PixelHuntGame(chat_id=chat_id, item_meta=item_meta)
+        active_hunt_games[chat_id] = game
+        try:
+            await game.start(message.bot)
+        except Exception:
+            # Например, нет файла картинки: раньше чат навсегда застревал в «вже триває дешифровка»
+            logger.exception("hunt start failed")
+            game.is_finished = True
+            active_hunt_games.pop(chat_id, None)
+            await message.answer("⚠️ Не вдалося запустити гру (перевірте картинку в assets/hunt).")
+    finally:
+        _creating_chats.discard(chat_id)
 
 
 @router.message(F.text, ~F.text.startswith("/"), ~F.text.startswith("!"), IsHuntActiveFilter())

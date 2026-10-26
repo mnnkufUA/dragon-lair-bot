@@ -78,8 +78,12 @@ async def sync_user_data(request: Request):
 
     if update_fields:
         await update_user(int(user_id), **update_fields)
+        try:
+            print(f"📥 /api/sync: User {user_id} saved data: {update_fields}")
+        except UnicodeEncodeError:
+            print(f"[SYNC] /api/sync: User {user_id} saved data: {update_fields}")
 
-    return {"status": "success"}
+    return {"status": "success", "saved_fields": list(update_fields.keys())}
 
 @app.post("/api/reset")
 async def reset_user_endpoint(request: Request):

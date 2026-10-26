@@ -66,18 +66,34 @@ async def get_or_create_user(user_id: int, username: str = "", first_name: str =
 def _update_user_sync(user_id: int, kwargs: dict):
     if not kwargs:
         return
-    fields = []
-    values = []
-    for k, v in kwargs.items():
-        fields.append(f"{k} = ?")
-        if isinstance(v, (dict, list)):
-            values.append(json.dumps(v, ensure_ascii=False))
-        else:
-            values.append(v)
-    values.append(user_id)
-
-    query = f"UPDATE users SET {', '.join(fields)} WHERE user_id = ?"
     with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        if not cur.fetchone():
+            default_unlocked = json.dumps([])
+            default_names = json.dumps({"fire": "Вогонько", "storm": "Блискавка", "frost": "Крижинка", "jade": "Смарагд"}, ensure_ascii=False)
+            default_named = json.dumps({"fire": False, "storm": False, "frost": False, "jade": False})
+            default_levels = json.dumps({"fire": 1, "storm": 1, "frost": 1, "jade": 1})
+            default_xp = json.dumps({"fire": 0, "storm": 0, "frost": 0, "jade": 0})
+            conn.execute("""
+                INSERT INTO users (
+                    user_id, username, first_name, coins, food, eggs, tears,
+                    active_element, unlocked_elements, dragon_names, named_dragons,
+                    dragon_levels, dragon_xp, last_train, last_expedition
+                ) VALUES (?, '', '', 0, 0, 0, 0, '', ?, ?, ?, ?, ?, 0, 0)
+            """, (user_id, default_unlocked, default_names, default_named, default_levels, default_xp))
+
+        fields = []
+        values = []
+        for k, v in kwargs.items():
+            fields.append(f"{k} = ?")
+            if isinstance(v, (dict, list)):
+                values.append(json.dumps(v, ensure_ascii=False))
+            else:
+                values.append(v)
+        values.append(user_id)
+
+        query = f"UPDATE users SET {', '.join(fields)} WHERE user_id = ?"
         conn.execute(query, tuple(values))
         conn.commit()
 

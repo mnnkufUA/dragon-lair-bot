@@ -1,5 +1,6 @@
 import asyncio
 import difflib
+import html
 import io
 import json
 import logging
@@ -35,6 +36,26 @@ def normalize_text(text: str) -> str:
     return t
 
 
+def guess_matches(guess: str, target: str) -> bool:
+    """Проверка ответа. Раньше любое слово из 3+ букв, которое является частью названия
+    (например «кот» или «the»), считалось правильным ответом — теперь строже."""
+    if not guess or not target:
+        return False
+    if guess == target:
+        return True
+    # Название целиком внутри сообщения (как отдельные слова): "это шрек наверное"
+    if len(target) >= 3 and f" {target} " in f" {guess} ":
+        return True
+    # Часть многословного названия, но достаточно длинная: "володар перснів" для "володар перснів: братство персня"
+    if len(target.split()) > 1 and len(guess) >= 4 and f" {guess} " in f" {target} " and len(guess) >= 0.4 * len(target):
+        return True
+    # Опечатки
+    if len(target) >= 4 and len(guess) >= 4:
+        if difflib.SequenceMatcher(None, guess, target).ratio() >= HUNT_FUZZY_THRESHOLD:
+            return True
+    return False
+
+
 class PixelHuntGame:
     def __init__(self, chat_id: int, item_meta: dict):
         self.chat_id = chat_id
@@ -57,7 +78,7 @@ class PixelHuntGame:
 
         # Cache generated stage image bytes
         self.cached_images: Dict[int, bytes] = {}
-        self._prepare_stage_images()
+        # Картинки готовятся в start() в отдельном потоке — раньше это подвешивало всего бота на пару секунд
 
     def _prepare_stage_images(self):
         img_path = HUNT_ASSETS_DIR / self.meta["file"]
@@ -107,25 +128,27 @@ class PixelHuntGame:
             "🟩🟩🟩🟩🟩🟩"
         ]
         bar = bars[min(self.phase, 6)]
-        media_type = self.meta.get("type", "Фільм / Гра / Мультфільм")
-        next_hint = f"⏳ Наступна фаза через: **{HUNT_PHASE_SECONDS} сек**\n" if self.phase < 6 else "⚡ Фінальна фаза!\n"
+        media_type = html.escape(str(self.meta.get("type", "Фільм / Гра / Мультфільм")))
+        hint = html.escape(str(self.meta.get("hint", "Що приховано в серпанку?")))
+        next_hint = f"⏳ Наступна фаза через: <b>{HUNT_PHASE_SECONDS} сек</b>\n" if self.phase < 6 else "⚡ Фінальна фаза!\n"
         return (
-            f"👁️ **ОКО ДРАКОНА: ДЕШИФРАТОР СИГНАЛУ** 👁️\n\n"
-            f"Категорія: **{media_type}**\n"
-            f"💡 Підказка: *{self.meta.get('hint', 'Що приховано в серпанку?')}*\n"
+            f"👁️ <b>ОКО ДРАКОНА: ДЕШИФРАТОР СИГНАЛУ</b> 👁️\n\n"
+            f"Категорія: <b>{media_type}</b>\n"
+            f"💡 Підказка: <i>{hint}</i>\n"
             f"📊 Гострота зору: {bar} (Фаза {self.phase}/6)\n"
             f"{next_hint}"
-            f"🏆 Скарб прямо зараз: **{reward} 🪙 Монет**\n\n"
+            f"🏆 Скарб прямо зараз: <b>{reward} 🪙 Монет</b>\n\n"
             f"Пишіть назву фільму, гри, мультфільму чи ім'я персонажа/актора у чат! Без мутів."
         )
 
     async def start(self, bot: Bot):
+        await asyncio.to_thread(self._prepare_stage_images)
         photo = BufferedInputFile(self.cached_images[1], filename="dragon_hunt_p1.png")
         msg = await bot.send_photo(
             chat_id=self.chat_id,
             photo=photo,
             caption=self.get_caption(),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         self.message_id = msg.message_id
         self.phase_task = asyncio.create_task(self._progression_loop(bot))
@@ -147,6 +170,10 @@ class PixelHuntGame:
                     await self._reveal_unanswered(bot)
         except asyncio.CancelledError:
             pass
+        except Exception as e:
+            logger.error(f"Hunt progression loop crashed: {e}", exc_info=True)
+            self.is_finished = True
+            active_hunt_games.pop(self.chat_id, None)
 
     async def _update_media(self, bot: Bot):
         if not self.message_id:
@@ -155,7 +182,7 @@ class PixelHuntGame:
         media = InputMediaPhoto(
             media=BufferedInputFile(img_bytes, filename=f"dragon_hunt_p{self.phase}.png"),
             caption=self.get_caption(),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         try:
             await bot.edit_message_media(
@@ -168,7 +195,8 @@ class PixelHuntGame:
 
     async def check_guess(self, user_id: int, username: str, first_name: str, text: str, bot: Bot) -> bool:
         async with self.lock:
-            if self.is_finished:
+            if self.is_finished or self.message_id is None:
+                # игра ещё готовит картинку — ответы пока не принимаем
                 return False
 
             now = time.time()
@@ -187,24 +215,7 @@ class PixelHuntGame:
             for alias in self.meta.get("aliases", []):
                 targets.append(normalize_text(alias))
 
-            matched = False
-            for target in targets:
-                if not target:
-                    continue
-                # 1. Exact match
-                if clean_text == target:
-                    matched = True
-                    break
-                # 2. Substring or target contained in user message words
-                if target in clean_text or clean_text in target:
-                    if len(clean_text) >= 3 and len(target) >= 3:
-                        matched = True
-                        break
-                # 3. Fuzzy matching with threshold
-                ratio = difflib.SequenceMatcher(None, clean_text, target).ratio()
-                if ratio >= HUNT_FUZZY_THRESHOLD:
-                    matched = True
-                    break
+            matched = any(guess_matches(clean_text, t) for t in targets if t)
 
             if matched:
                 await self._finish_with_winner(user_id, username, first_name, bot)
@@ -229,29 +240,29 @@ class PixelHuntGame:
         except Exception as e:
             logger.error(f"Failed to record hunt win: {e}")
 
-        display_name = f"@{username}" if username else first_name
+        display_name = html.escape(f"@{username}" if username else first_name)
 
         win_caption = (
-            f"🎉 **СИГНАЛ УСПІШНО ДЕШИФРОВАНО!** 🎉\n\n"
-            f"Правильна відповідь: **{self.meta['answer']}**\n"
+            f"🎉 <b>СИГНАЛ УСПІШНО ДЕШИФРОВАНО!</b> 🎉\n\n"
+            f"Правильна відповідь: <b>{html.escape(str(self.meta['answer']))}</b>\n"
             f"🥇 Першим розгадав: {display_name} (на {self.phase}-й фазі)!\n"
-            f"🏆 Здобуток: **+{reward} 🪙 Монет** зачислено у скарбницю!\n"
+            f"🏆 Здобуток: <b>+{reward} 🪙 Монет</b> зачислено у скарбницю!\n"
         )
         if food > 0:
-            win_caption += "🍖 **+1 Смаколик** (випав з шансом 20%)!\n"
+            win_caption += "🍖 <b>+1 Смаколик</b> (випав з шансом 20%)!\n"
         if egg > 0:
             win_caption += (
-                "🥚 **ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!**\n"
-                "Запустіть `/roulette` або `!рулетка`, щоб відкрити нового дракона!\n"
+                "🥚 <b>ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!</b>\n"
+                "Запустіть <code>/roulette</code> або <code>!рулетка</code>, щоб відкрити нового дракона!\n"
             )
-        win_caption += "\n🐉 Відкрити Лігво: `/lair` або `!моєлігво`" 
+        win_caption += "\n🐉 Відкрити Лігво: <code>/lair</code> або <code>!моєлігво</code>" 
 
         if self.message_id:
             try:
                 media = InputMediaPhoto(
-                    media=BufferedInputFile(self.cached_images[4], filename="dragon_hunt_final.png"),
+                    media=BufferedInputFile(self.cached_images[6], filename="dragon_hunt_final.png"),
                     caption=win_caption,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
                 await bot.edit_message_media(
                     chat_id=self.chat_id,
@@ -260,7 +271,7 @@ class PixelHuntGame:
                 )
             except Exception:
                 try:
-                    await bot.send_message(self.chat_id, win_caption, parse_mode="Markdown")
+                    await bot.send_message(self.chat_id, win_caption, parse_mode="HTML")
                 except Exception:
                     pass
 
@@ -269,18 +280,18 @@ class PixelHuntGame:
         active_hunt_games.pop(self.chat_id, None)
 
         reveal_caption = (
-            f"⌛ **ЧАС РОЗГАДКИ ВИТІК!** ⌛\n\n"
+            f"⌛ <b>ЧАС РОЗГАДКИ ВИТІК!</b> ⌛\n\n"
             f"Ніхто не зміг вгадати цей об'єкт.\n"
-            f"Правильна відповідь: **{self.meta['answer']}**\n\n"
+            f"Правильна відповідь: <b>{html.escape(str(self.meta['answer']))}</b>\n\n"
             f"Скарби повертаються до лігва Дракона. Наступного разу пощастить!"
         )
 
         if self.message_id:
             try:
                 media = InputMediaPhoto(
-                    media=BufferedInputFile(self.cached_images[4], filename="dragon_hunt_reveal.png"),
+                    media=BufferedInputFile(self.cached_images[6], filename="dragon_hunt_reveal.png"),
                     caption=reveal_caption,
-                    parse_mode="Markdown"
+                    parse_mode="HTML"
                 )
                 await bot.edit_message_media(
                     chat_id=self.chat_id,
@@ -289,7 +300,7 @@ class PixelHuntGame:
                 )
             except Exception:
                 try:
-                    await bot.send_message(self.chat_id, reveal_caption, parse_mode="Markdown")
+                    await bot.send_message(self.chat_id, reveal_caption, parse_mode="HTML")
                 except Exception:
                     pass
 
