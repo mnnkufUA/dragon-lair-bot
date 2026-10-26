@@ -14326,6 +14326,7 @@
     // CLOUD SYNC FOR TELEGRAM BOT (24/7 BACKEND)
     // ==========================================
     window.tgUserId = null;
+    window.cloudStateLoaded = false; // true только после успешной загрузки данных с сервера
     try {
       if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
         window.tgUserId = Telegram.WebApp.initDataUnsafe.user.id;
@@ -14340,6 +14341,7 @@
         if (!res.ok) return;
         const data = await res.json();
         if (data && data.user_id) {
+          window.cloudStateLoaded = true;
           sparksBalance = data.coins !== undefined ? data.coins : sparksBalance;
           foodCount = data.food !== undefined ? data.food : foodCount;
           eggsInventory = data.eggs !== undefined ? data.eggs : eggsInventory;
@@ -14377,6 +14379,7 @@
     }
 
     function syncWithServer() {
+      if (!window.cloudStateLoaded) return;
       if (!window.tgUserId) return;
       try {
         fetch('/api/sync', {
@@ -14398,6 +14401,41 @@
         }).catch(e => console.log('Sync error:', e));
       } catch (e) {}
     }
+
+    // Подтягиваем с сервера монеты/яйца/драконов, когда игрок возвращается в приложение
+    // (например, выиграл монеты в групповой игре, пока апп был свёрнут).
+    async function refreshCloudBalances() {
+      if (!window.tgUserId || !window.cloudStateLoaded) return;
+      try {
+        const res = await fetch(`/api/user?user_id=${window.tgUserId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.user_id) return;
+        if (data.coins !== undefined) sparksBalance = data.coins;
+        if (data.food !== undefined) foodCount = data.food;
+        if (data.eggs !== undefined) eggsInventory = data.eggs;
+        if (data.tears !== undefined) dragonTearsBalance = data.tears;
+        if (data.unlocked_elements) {
+          try {
+            const u = JSON.parse(data.unlocked_elements);
+            if (Array.isArray(u)) unlockedElements = u;
+          } catch (e) {}
+        }
+        if (!activeDragonKey && unlockedElements.length > 0) {
+          setElement(data.active_element && unlockedElements.includes(data.active_element) ? data.active_element : unlockedElements[0]);
+        }
+        updateCurrencyUI();
+        updateElementButtonsUI();
+        checkEmptyLairState();
+      } catch (e) { console.log("refreshCloudBalances error:", e); }
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCloudBalances(); });
+    window.addEventListener('focus', refreshCloudBalances);
+    try {
+      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.onEvent) {
+        Telegram.WebApp.onEvent('activated', refreshCloudBalances);
+      }
+    } catch (e) {}
 
     // Load cloud state on init
     loadCloudUserState();
@@ -14531,6 +14569,19 @@
     }
 
     function adminUnlockAllDragons(hatched = true) {
+      try {
+        adminUnlockAllDragonsInner(hatched);
+      } catch (e) {
+        console.error("adminUnlockAllDragons error:", e);
+        showNotice("⚠️ Драконів розблоковано, але частина візуалу не оновилась: " + (e && e.message ? e.message : e));
+      } finally {
+        try { updateElementButtonsUI(); } catch (e) {}
+        try { checkEmptyLairState(); } catch (e) {}
+        syncWithServer(); // обязательно сохраняем на сервер, чтобы бот тоже увидел
+      }
+    }
+
+    function adminUnlockAllDragonsInner(hatched = true) {
       unlockedElements = ['fire', 'storm', 'frost', 'jade'];
       activeDragonKey = 'fire';
       currentElement = 'fire';

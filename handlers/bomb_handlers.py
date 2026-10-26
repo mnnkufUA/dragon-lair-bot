@@ -1,24 +1,60 @@
+import logging
+
 from aiogram import Router, types, F
 from aiogram.filters import Command, Filter
+
 import database
 from games.cyber_bomb import BombGame, Player, active_bomb_games
+from games.cities_game import active_cities_games
+from games.pixel_hunt import active_hunt_games
 from config import BOMB_TURN_SECONDS
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="bomb_router")
+
+# чаты, в которых прямо сейчас создаётся игра (защита от двойного запуска двумя людьми одновременно)
+_creating_chats: set[int] = set()
+
+
+def chat_has_game(chat_id: int) -> bool:
+    """В одном чате может идти только одна игра (бомба / міста / фільм)."""
+    return (
+        chat_id in active_bomb_games
+        or chat_id in active_cities_games
+        or chat_id in active_hunt_games
+        or chat_id in _creating_chats
+    )
+
+
+async def can_stop_game(message: types.Message, creator_id: int) -> bool:
+    """Остановить игру может создатель или админ чата."""
+    if not message.from_user:
+        return False
+    if message.from_user.id == creator_id:
+        return True
+    try:
+        member = await message.bot.get_chat_member(message.chat.id, message.from_user.id)
+        return member.status in ("creator", "administrator")
+    except Exception:
+        return False
 
 
 class IsBombTurnFilter(Filter):
     async def __call__(self, message: types.Message) -> bool:
+        if not message.from_user:
+            return False
         game = active_bomb_games.get(message.chat.id)
         return bool(
-            game 
-            and game.state == "ACTIVE" 
-            and game.current_player 
+            game
+            and game.state == "ACTIVE"
+            and game.current_player
             and game.current_player.user_id == message.from_user.id
         )
 
 
 BOMB_TRIGGERS = {"!бомба", "бомба", "!bomb", "bomb", "!ядро", "ядро"}
+
 
 def is_bomb_trigger(text: str) -> bool:
     if not text:
@@ -32,21 +68,23 @@ def is_bomb_trigger(text: str) -> bool:
 async def cmd_bomb(message: types.Message):
     chat_id = message.chat.id
 
-    if chat_id in active_bomb_games:
-        game = active_bomb_games[chat_id]
-        if game.state == "LOBBY":
+    if chat_has_game(chat_id):
+        game = active_bomb_games.get(chat_id)
+        if game and game.state == "LOBBY":
             await message.answer("⚠️ У цьому чаті вже триває збір у лобі! Натискайте «➕ Приєднатися» вище.")
-        else:
+        elif game:
             await message.answer(
-                "⚠️ У цьому чаті вже лютує «Полум'я Дракона» (Бомба)!\nЯкщо раунд потрібно скинути, надішліть `/stop_bomb`.",
-                parse_mode="Markdown"
+                "⚠️ У цьому чаті вже лютує «Полум'я Дракона» (Бомба)!\nЯкщо раунд потрібно скинути, надішліть <code>/stop_bomb</code>.",
+                parse_mode="HTML"
             )
+        else:
+            await message.answer("⚠️ У цьому чаті вже йде інша гра. Дочекайтеся її завершення.")
         return
 
     bet = 0
     turn_seconds = BOMB_TURN_SECONDS
     args = (message.text or "").split()
-    
+
     if len(args) > 1:
         try:
             bet = int(args[1])
@@ -67,21 +105,34 @@ async def cmd_bomb(message: types.Message):
             pass
 
     creator_id = message.from_user.id if message.from_user else message.chat.id
-    if bet > 0:
-        has_funds = await database.try_deduct_coins(creator_id, bet)
-        if not has_funds:
-            await message.answer(f"❌ Недостатньо 🪙 монет для ставки {bet}!")
-            return
 
-    creator_player = Player(
-        user_id=creator_id,
-        username=message.from_user.username if message.from_user else "",
-        first_name=message.from_user.first_name if message.from_user else "Володар"
-    )
+    _creating_chats.add(chat_id)
+    try:
+        if bet > 0:
+            has_funds = await database.try_deduct_coins(creator_id, bet)
+            if not has_funds:
+                await message.answer(f"❌ Недостатньо 🪙 монет для ставки {bet}!")
+                return
 
-    game = BombGame(chat_id=chat_id, creator=creator_player, bet=bet, turn_seconds=turn_seconds)
-    active_bomb_games[chat_id] = game
-    await game.start_lobby(message.bot)
+        creator_player = Player(
+            user_id=creator_id,
+            username=message.from_user.username if message.from_user else "",
+            first_name=message.from_user.first_name if message.from_user else "Володар"
+        )
+
+        game = BombGame(chat_id=chat_id, creator=creator_player, bet=bet, turn_seconds=turn_seconds)
+        active_bomb_games[chat_id] = game
+        try:
+            await game.start_lobby(message.bot)
+        except Exception:
+            # Не удалось отправить лобби — снимаем игру и возвращаем ставку, чтобы чат не завис
+            logger.exception("bomb start_lobby failed")
+            active_bomb_games.pop(chat_id, None)
+            if bet > 0:
+                await database.add_coins(creator_id, bet)
+            await message.answer("⚠️ Не вдалося запустити гру. Спробуйте ще раз.")
+    finally:
+        _creating_chats.discard(chat_id)
 
 
 @router.message(Command("stop_bomb", "stopbomb", "стоп_бомба"))
@@ -92,9 +143,13 @@ async def cmd_stop_bomb(message: types.Message):
         await message.answer("У цьому чаті зараз немає активної гри «Бомба».")
         return
 
+    if not await can_stop_game(message, game.creator_id):
+        await message.answer("🚫 Зупинити гру може лише той, хто її створив, або адміністратор чату.")
+        return
+
     name = message.from_user.first_name if message.from_user else "Гравцем"
     await game.force_stop(
-        message.bot, 
+        message.bot,
         reason=f"Гру зупинено волею {name}."
     )
 
@@ -105,6 +160,10 @@ async def cb_bomb_speed(callback: types.CallbackQuery):
     game = active_bomb_games.get(chat_id)
     if not game:
         await callback.answer("Бій уже не активний.", show_alert=True)
+        return
+
+    if callback.from_user.id != game.creator_id:
+        await callback.answer("Лише творець лобі може змінювати час!", show_alert=True)
         return
 
     try:
@@ -156,12 +215,12 @@ async def cb_bomb_start_now(callback: types.CallbackQuery):
         await callback.answer("Лише творець лобі може розпочати гру достроково!", show_alert=True)
         return
 
-    if len(game.players) < 1:
-        await callback.answer("Потрібно мінімум 1 гравець!", show_alert=True)
+    if game.state != "LOBBY":
+        await callback.answer("Гра вже розпочалась!", show_alert=True)
         return
 
-    await callback.answer("Розпалюємо полум'я дракона!")
-    await game.start_game(callback.bot)
+    ok, msg = await game.start_game(callback.bot)
+    await callback.answer("Розпалюємо полум'я дракона!" if ok else msg, show_alert=not ok)
 
 
 @router.callback_query(F.data == "bomb_freeze")

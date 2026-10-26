@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import logging
 import random
@@ -59,14 +60,14 @@ class Player:
     def display_name(self) -> str:
         tag = "🔴 " if self.team == "red" else "🔵 "
         if self.username:
-            return f"{tag}@{self.username}"
-        return f"{tag}{self.first_name}"
+            return f"{tag}{html.escape('@' + self.username)}"
+        return f"{tag}{html.escape(self.first_name)}"
 
     @property
     def plain_name(self) -> str:
         if self.username:
-            return f"@{self.username}"
-        return self.first_name
+            return html.escape(f"@{self.username}")
+        return html.escape(self.first_name)
 
 
 class CitiesGame:
@@ -78,6 +79,10 @@ class CitiesGame:
         self.turn_seconds = self.base_turn_seconds
 
         self.players: List[Player] = [creator]
+        # Кто реально заплатил ставку (чтобы вернуть деньги даже выбывшим игрокам)
+        self.paid_ids: Set[int] = {creator.user_id} if bet > 0 else set()
+        self.initial_count: int = 1
+        self.turn_deadline: float = 0
         self.state: str = "LOBBY"  # LOBBY, ACTIVE, FINISHED
         self.mode: str = "FFA"  # "FFA" (кожен сам за себе) or "TEAM" (командна битва) or "SOLO"
         self.message_id: Optional[int] = None
@@ -107,7 +112,19 @@ class CitiesGame:
 
     @property
     def total_pot(self) -> int:
-        return self.bet * len(self.players)
+        # В лобби банк растёт с каждым игроком; после старта он фиксирован
+        count = len(self.players) if self.state == "LOBBY" else self.initial_count
+        return self.bet * count
+
+    async def _refund_all(self):
+        """Возвращает ставки всем, кто их внёс."""
+        if self.bet > 0:
+            for uid in list(self.paid_ids):
+                try:
+                    await database.add_coins(uid, self.bet)
+                except Exception as e:
+                    logger.error(f"Refund failed for {uid}: {e}")
+        self.paid_ids.clear()
 
     @property
     def red_players(self) -> List[Player]:
@@ -181,37 +198,37 @@ class CitiesGame:
             self.chat_id,
             lobby_text,
             reply_markup=self.get_lobby_markup(),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         self.message_id = msg.message_id
         self.lobby_task = asyncio.create_task(self._lobby_countdown(bot))
 
     def _build_lobby_text(self) -> str:
         if self.mode == "TEAM":
-            red_list = "\n".join(f"  • {p.plain_name}" for p in self.red_players) or "  *(порожньо)*"
-            blue_list = "\n".join(f"  • {p.plain_name}" for p in self.blue_players) or "  *(порожньо)*"
+            red_list = "\n".join(f"  • {p.plain_name}" for p in self.red_players) or "  <i>(порожньо)</i>"
+            blue_list = "\n".join(f"  • {p.plain_name}" for p in self.blue_players) or "  <i>(порожньо)</i>"
             player_info = (
-                f"🛡️ **Командний склад:**\n"
-                f"🔴 **Команда Вогню ({len(self.red_players)}):**\n{red_list}\n\n"
-                f"🔵 **Команда Льоду ({len(self.blue_players)}):**\n{blue_list}"
+                f"🛡️ <b>Командний склад:</b>\n"
+                f"🔴 <b>Команда Вогню ({len(self.red_players)}):</b>\n{red_list}\n\n"
+                f"🔵 <b>Команда Льоду ({len(self.blue_players)}):</b>\n{blue_list}"
             )
         else:
             player_list = "\n".join(
                 f"{i+1}. {p.plain_name}" + (" (Провідник)" if i == 0 else "")
                 for i, p in enumerate(self.players)
             )
-            player_info = f"👥 **Мандрівники ({len(self.players)}/{CITIES_MAX_PLAYERS}):**\n{player_list}"
+            player_info = f"👥 <b>Мандрівники ({len(self.players)}/{CITIES_MAX_PLAYERS}):</b>\n{player_list}"
 
         mode_name = "🛡️ Командна битва (🔴 vs 🔵)" if self.mode == "TEAM" else ("👤 Соло проти Дракона" if len(self.players) == 1 else "⚔️ Кожен сам за себе")
 
         return (
-            f"🏛️ **МІСТА ДРАКОНА: ЗБІР МАНДРІВНИКІВ** 🏛️\n\n"
-            f"Режим: **{mode_name}**\n"
-            f"🪙 Ставка: **{self.bet} Монет**\n"
-            f"🏆 Нагорода: **15–25 🪙** (або скарбниця ставок)\n"
-            f"⏱️ Час на хід: **{self.base_turn_seconds} сек**\n\n"
+            f"🏛️ <b>МІСТА ДРАКОНА: ЗБІР МАНДРІВНИКІВ</b> 🏛️\n\n"
+            f"Режим: <b>{mode_name}</b>\n"
+            f"🪙 Ставка: <b>{self.bet} Монет</b>\n"
+            f"🏆 Нагорода: <b>15–25 🪙</b> (або скарбниця ставок)\n"
+            f"⏱️ Час на хід: <b>{self.base_turn_seconds} сек</b>\n\n"
             f"{player_info}\n\n"
-            f"📜 *Правила гри:* гравець називає місто, наступний має назвати місто на **останню літеру** "
+            f"📜 <i>Правила гри:</i> гравець називає місто, наступний має назвати місто на <b>останню літеру</b> "
             f"(наприклад, «Київ» закінчується на «В» -> «Варшава»)! Якщо закінчується на «ь» чи апостроф, береться попередня літера.\n\n"
             f"⏳ Очікування ({CITIES_LOBBY_SECONDS}с) або тисніть «Розпочати»!"
         )
@@ -221,7 +238,7 @@ class CitiesGame:
             await asyncio.sleep(CITIES_LOBBY_SECONDS)
             async with self.lock:
                 if self.state == "LOBBY":
-                    await self.start_game(bot)
+                    await self._start_game_locked(bot)
         except asyncio.CancelledError:
             pass
 
@@ -275,6 +292,8 @@ class CitiesGame:
             if self.mode == "TEAM":
                 player.team = "blue" if len(self.red_players) > len(self.blue_players) else "red"
 
+            if self.bet > 0:
+                self.paid_ids.add(player.user_id)
             self.players.append(player)
             await self._update_lobby_message(bot)
             return True, f"Ви приєдналися до подорожі!"
@@ -289,7 +308,8 @@ class CitiesGame:
                 return False, "Вас немає у грі."
 
             self.players.pop(idx)
-            if self.bet > 0:
+            if self.bet > 0 and user_id in self.paid_ids:
+                self.paid_ids.discard(user_id)
                 await database.add_coins(user_id, self.bet)
 
             if not self.players:
@@ -320,20 +340,35 @@ class CitiesGame:
                 chat_id=self.chat_id,
                 message_id=self.message_id,
                 reply_markup=self.get_lobby_markup(),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except Exception:
             pass
 
     async def start_game(self, bot: Bot) -> tuple[bool, str]:
+        """Публичный запуск (кнопка «Розпочати»). Берёт блокировку, чтобы не столкнуться с таймером лобби."""
+        async with self.lock:
+            return await self._start_game_locked(bot)
+
+    async def _start_game_locked(self, bot: Bot) -> tuple[bool, str]:
+        if self.state != "LOBBY":
+            return False, "Гру вже розпочато."
+
         if not self.players:
             self.state = "FINISHED"
             active_cities_games.pop(self.chat_id, None)
             return False, "Немає гравців!"
 
-        if self.lobby_task and not self.lobby_task.done():
+        # Сам себя таймер лобби отменять не должен (иначе первый ход не отправится)
+        if self.lobby_task and not self.lobby_task.done() and self.lobby_task is not asyncio.current_task():
             self.lobby_task.cancel()
 
+        # Соло против дракона — без ставок: возвращаем монеты, иначе они бы просто сгорели
+        if len(self.players) == 1 and self.bet > 0:
+            await self._refund_all()
+            self.bet = 0
+
+        self.initial_count = len(self.players)
         self.state = "ACTIVE"
         self.turn_seconds = self.base_turn_seconds
 
@@ -341,7 +376,7 @@ class CitiesGame:
         if len(self.players) == 1:
             self.mode = "SOLO"
             self.current_player_idx = 0
-            start_desc = f"🐉 **СОЛО-БИТВА ПРОТИ ДРАКОНА!**\nГравець: {self.players[0].plain_name} кидає виклик магічній пам'яті Дракона!"
+            start_desc = f"🐉 <b>СОЛО-БИТВА ПРОТИ ДРАКОНА!</b>\nГравець: {self.players[0].plain_name} кидає виклик магічній пам'яті Дракона!"
         elif self.mode == "TEAM":
             # Ensure balanced teams
             if not self.red_players or not self.blue_players:
@@ -363,12 +398,12 @@ class CitiesGame:
                     interleaved.append(blues[i])
             self.players = interleaved
             self.current_player_idx = 0
-            start_desc = f"🛡️ **КОМАНДНА БИТВА РОЗПОЧАЛАСЯ!**\n🔴 Команда Вогню ({len(self.red_players)}) проти 🔵 Команди Льоду ({len(self.blue_players)})!"
+            start_desc = f"🛡️ <b>КОМАНДНА БИТВА РОЗПОЧАЛАСЯ!</b>\n🔴 Команда Вогню ({len(self.red_players)}) проти 🔵 Команди Льоду ({len(self.blue_players)})!"
         else:
             # Free For All
             random.shuffle(self.players)
             self.current_player_idx = 0
-            start_desc = f"⚔️ **ПОДОРОЖ МІСТАМИ РОЗПОЧАЛАСЯ!**\nУсі гравці змагаються кожен сам за себе!"
+            start_desc = f"⚔️ <b>ПОДОРОЖ МІСТАМИ РОЗПОЧАЛАСЯ!</b>\nУсі гравці змагаються кожен сам за себе!"
 
         # Pick random starting city
         starter = random.choice(self.starter_cities)
@@ -380,11 +415,11 @@ class CitiesGame:
 
         start_text = (
             f"🗺️ {start_desc}\n\n"
-            f"🐉 Дракон задає перше місто: **{starter}**!\n"
-            f"👉 Наступне місто має починатися на літеру: **[ {self.current_letter.upper()} ]**"
+            f"🐉 Дракон задає перше місто: <b>{html.escape(starter)}</b>!\n"
+            f"👉 Наступне місто має починатися на літеру: <b>[ {self.current_letter.upper()} ]</b>"
         )
         try:
-            await bot.send_message(self.chat_id, start_text, parse_mode="Markdown")
+            await bot.send_message(self.chat_id, start_text, parse_mode="HTML")
         except Exception:
             pass
 
@@ -401,15 +436,16 @@ class CitiesGame:
             return
 
         curr.strikes = 0
+        self.turn_deadline = time.time() + self.turn_seconds
 
         turn_title = f"Хід {curr.display_name}!" if self.mode == "TEAM" else f"Хід {curr.plain_name}!"
 
         turn_text = (
-            f"🏛️ **{turn_title}**\n\n"
-            f"Попереднє місто: **{self.current_city}**\n"
-            f"Твоя літера: **[ {self.current_letter.upper()} ]**\n"
-            f"⏳ Таймер: **{self.turn_seconds} секунд**\n\n"
-            f"✍️ Напиши місто, яке **починається на літеру {self.current_letter.upper()}**!"
+            f"🏛️ <b>{turn_title}</b>\n\n"
+            f"Попереднє місто: <b>{html.escape(self.current_city)}</b>\n"
+            f"Твоя літера: <b>[ {self.current_letter.upper()} ]</b>\n"
+            f"⏳ Таймер: <b>{self.turn_seconds} секунд</b>\n\n"
+            f"✍️ Напиши місто, яке <b>починається на літеру {self.current_letter.upper()}</b>!"
         )
 
         try:
@@ -417,7 +453,7 @@ class CitiesGame:
                 self.chat_id,
                 turn_text,
                 reply_markup=self.get_game_markup(),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
             self.message_id = msg.message_id
         except Exception:
@@ -427,7 +463,7 @@ class CitiesGame:
 
     async def _turn_timeout_watcher(self, bot: Bot, player_idx: int):
         try:
-            await asyncio.sleep(self.turn_seconds)
+            await asyncio.sleep(max(0.0, self.turn_deadline - time.time()))
             async with self.lock:
                 if self.state == "ACTIVE" and self.current_player_idx == player_idx:
                     await self._eliminate_player(bot, reason="Час вичерпано! Не встиг назвати місто.")
@@ -455,7 +491,8 @@ class CitiesGame:
                 await bot.send_message(
                     self.chat_id,
                     f"❌ {curr.plain_name}, це місто не приймається у грі! "
-                    f"Назви інше місто на літеру **[{self.current_letter.upper()}]**."
+                    f"Назви інше місто на літеру <b>[{self.current_letter.upper()}]</b>.",
+                    parse_mode="HTML"
                 )
                 return True
 
@@ -468,8 +505,8 @@ class CitiesGame:
                 else:
                     await bot.send_message(
                         self.chat_id,
-                        f"❌ {curr.plain_name}, місто має починатися на літеру **[{self.current_letter.upper()}]**! (Спроба {curr.strikes}/3)",
-                        parse_mode="Markdown"
+                        f"❌ {curr.plain_name}, місто має починатися на літеру <b>[{self.current_letter.upper()}]</b>! (Спроба {curr.strikes}/3)",
+                        parse_mode="HTML"
                     )
                 return True
 
@@ -488,8 +525,8 @@ class CitiesGame:
                 else:
                     await bot.send_message(
                         self.chat_id,
-                        f"🌍 {curr.plain_name}, місто «{word.strip()}» не знайдено у мапі світу! (Спроба {curr.strikes}/3)",
-                        parse_mode="Markdown"
+                        f"🌍 {curr.plain_name}, місто «{html.escape(word.strip())}» не знайдено у мапі світу! (Спроба {curr.strikes}/3)",
+                        parse_mode="HTML"
                     )
                 return True
 
@@ -497,7 +534,8 @@ class CitiesGame:
             if matched_key in self.used_cities:
                 await bot.send_message(
                     self.chat_id,
-                    f"⚠️ Місто «{ALL_CITIES[matched_key]}» вже називали у цій подорожі! Придумай інше місто на **[{self.current_letter.upper()}]**."
+                    f"⚠️ Місто «{html.escape(ALL_CITIES[matched_key])}» вже називали у цій подорожі! Придумай інше місто на <b>[{self.current_letter.upper()}]</b>.",
+                    parse_mode="HTML"
                 )
                 return True
 
@@ -523,8 +561,9 @@ class CitiesGame:
 
                 await bot.send_message(
                     self.chat_id,
-                    f"✅ {player_name} назвав: **{display_title}**! (на кінці «{next_letter.upper()}»)\n"
-                    f"👉 {next_name}: місто на літеру **[ {self.current_letter.upper()} ]**!"
+                    f"✅ {player_name} назвав: <b>{html.escape(display_title)}</b>! (на кінці «{next_letter.upper()}»)\n"
+                    f"👉 {next_name}: місто на літеру <b>[ {self.current_letter.upper()} ]</b>!",
+                    parse_mode="HTML"
                 )
                 await self._start_turn(bot)
 
@@ -538,7 +577,7 @@ class CitiesGame:
         ]
 
         if candidates:
-            chosen_key = random.choice(candidates[:30])
+            chosen_key = random.choice(candidates)
             dragon_city = ALL_CITIES[chosen_key]
             self.used_cities.add(chosen_key)
             self.current_city = dragon_city
@@ -546,9 +585,10 @@ class CitiesGame:
 
             await bot.send_message(
                 self.chat_id,
-                f"✅ {player.plain_name}: **{player_city}**!\n"
-                f"🐉 Дракон відповідає: **{dragon_city}**!\n"
-                f"👉 Твоя нова літера: **[ {self.current_letter.upper()} ]** (Раунд {self.round_count}/8)"
+                f"✅ {player.plain_name}: <b>{html.escape(player_city)}</b>!\n"
+                f"🐉 Дракон відповідає: <b>{html.escape(dragon_city)}</b>!\n"
+                f"👉 Твоя нова літера: <b>[ {self.current_letter.upper()} ]</b> (Раунд {self.round_count}/8)",
+                parse_mode="HTML"
             )
 
             # Victory condition in solo mode (8 rounds)
@@ -561,7 +601,8 @@ class CitiesGame:
         else:
             await bot.send_message(
                 self.chat_id,
-                f"🤯 Дракон не зміг знайти місто на літеру **[{req.upper()}]** і схиляє голову перед тобою!"
+                f"🤯 Дракон не зміг знайти місто на літеру <b>[{req.upper()}]</b> і схиляє голову перед тобою!",
+                parse_mode="HTML"
             )
             await self._finish_solo_victory(player, bot)
 
@@ -579,12 +620,12 @@ class CitiesGame:
             logger.error(f"Error recording cities win: {e}")
 
         win_text = (
-            f"👑 **ТРИУМФ У СОЛО-ПОДОРОЖІ З ДРАКОНОМ!** 👑\n\n"
+            f"👑 <b>ТРИУМФ У СОЛО-ПОДОРОЖІ З ДРАКОНОМ!</b> 👑\n\n"
             f"🏆 {player.plain_name} переміг стародавнього Дракона у знанні географії!\n"
-            f"💰 Винагорода: **+{prize} 🪙 Монет**\n"
+            f"💰 Винагорода: <b>+{prize} 🪙 Монет</b>\n"
             f"🎉 Справжній картограф та майстер міст!"
         )
-        await bot.send_message(self.chat_id, win_text, parse_mode="Markdown")
+        await bot.send_message(self.chat_id, win_text, parse_mode="HTML")
 
     async def use_compass(self, user_id: int, bot: Bot) -> tuple[bool, str]:
         async with self.lock:
@@ -598,6 +639,7 @@ class CitiesGame:
 
             curr.compass_available = False
             self.turn_seconds += 7
+            self.turn_deadline += 7  # ровно +7 секунд к тому, что осталось
 
             curr_task = asyncio.current_task()
             if self.timer_task and self.timer_task is not curr_task and not self.timer_task.done():
@@ -606,13 +648,15 @@ class CitiesGame:
 
             await bot.send_message(
                 self.chat_id,
-                f"🧭 {curr.plain_name} застосував **Компас Дракона**! +7 секунд на роздуми!",
-                parse_mode="Markdown"
+                f"🧭 {curr.plain_name} застосував <b>Компас Дракона</b>! +7 секунд на роздуми!",
+                parse_mode="HTML"
             )
             return True, "Компас активовано!"
 
     async def force_stop(self, bot: Bot, reason: str = "Гру зупинено."):
         async with self.lock:
+            if self.state == "FINISHED":
+                return
             self.state = "FINISHED"
             if self.lobby_task and not self.lobby_task.done():
                 self.lobby_task.cancel()
@@ -620,20 +664,16 @@ class CitiesGame:
                 self.timer_task.cancel()
 
             active_cities_games.pop(self.chat_id, None)
+            await self._refund_all()
 
-            # Refund bets
-            if self.bet > 0:
-                for p in self.players:
-                    try:
-                        await database.add_coins(p.user_id, self.bet)
-                    except Exception:
-                        pass
-
-            await bot.send_message(
-                self.chat_id,
-                f"🛑 **ГРУ «МІСТА ДРАКОНА» ЗУПИНЕНО!**\n{reason}\n*(Усі ставки повернено)*",
-                parse_mode="Markdown"
-            )
+            try:
+                await bot.send_message(
+                    self.chat_id,
+                    f"🛑 <b>ГРУ «МІСТА ДРАКОНА» ЗУПИНЕНО!</b>\n{html.escape(reason)}\n<i>(Усі ставки повернено)</i>",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
 
     async def _eliminate_player(self, bot: Bot, reason: str):
         curr_task = asyncio.current_task()
@@ -658,7 +698,7 @@ class CitiesGame:
                 f"🏜️ {eliminated.plain_name} збився з дороги! {reason}\n"
                 f"🐉 Дракон виграв цю подорож, але ти назвав {self.round_count} міст! Спробуй ще раз!"
             )
-            await bot.send_message(self.chat_id, loss_text, parse_mode="Markdown")
+            await bot.send_message(self.chat_id, loss_text, parse_mode="HTML")
             return
 
         # Multiplayer elimination message
@@ -666,10 +706,10 @@ class CitiesGame:
         elim_text = (
             f"🏜️ {name_str} збився з каравану і вибуває!\n"
             f"Причина: {reason}\n"
-            f"*(Жодних штрафів чи мутів — спілкуйся вільно!)*"
+            f"<i>(Жодних штрафів чи мутів — спілкуйся вільно!)</i>"
         )
         try:
-            await bot.send_message(self.chat_id, elim_text, parse_mode="Markdown")
+            await bot.send_message(self.chat_id, elim_text, parse_mode="HTML")
         except Exception:
             pass
 
@@ -694,14 +734,14 @@ class CitiesGame:
 
                 winner_names = ", ".join(w.plain_name for w in winners)
                 team_win_text = (
-                    f"👑 **ПЕРЕМОГА У КОМАНДНІЙ БИТВІ МІСТ!** 👑\n\n"
-                    f"🏆 Тріумфує **{winning_team_name}**!\n"
+                    f"👑 <b>ПЕРЕМОГА У КОМАНДНІЙ БИТВІ МІСТ!</b> 👑\n\n"
+                    f"🏆 Тріумфує <b>{winning_team_name}</b>!\n"
                     f"Герої команди: {winner_names}\n"
-                    f"💰 Винагорода: **+{share_prize} 🪙 Монет** кожному воїну!\n"
+                    f"💰 Винагорода: <b>+{share_prize} 🪙 Монет</b> кожному воїну!\n"
                     f"Чат вільний для нових пригод!"
                 )
                 try:
-                    await bot.send_message(self.chat_id, team_win_text, parse_mode="Markdown")
+                    await bot.send_message(self.chat_id, team_win_text, parse_mode="HTML")
                 except Exception:
                     pass
                 return
@@ -721,13 +761,13 @@ class CitiesGame:
                     logger.error(f"Error in cities win record: {e}")
 
                 win_text = (
-                    f"👑 **ПЕРЕМОГА У «МІСТАХ ДРАКОНА»!** 👑\n\n"
+                    f"👑 <b>ПЕРЕМОГА У «МІСТАХ ДРАКОНА»!</b> 👑\n\n"
                     f"🏆 Мандрівник {winner.plain_name} став єдиним знавцем мапи!\n"
-                    f"💰 Винагорода: **+{prize} 🪙 Монет**\n"
+                    f"💰 Винагорода: <b>+{prize} 🪙 Монет</b>\n"
                     f"🎉 Браво володарю географічних таємниць!"
                 )
                 try:
-                    await bot.send_message(self.chat_id, win_text, parse_mode="Markdown")
+                    await bot.send_message(self.chat_id, win_text, parse_mode="HTML")
                 except Exception:
                     pass
         else:
