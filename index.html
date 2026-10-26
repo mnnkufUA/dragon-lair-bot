@@ -13266,6 +13266,7 @@
 
       applyDragonNameUI();
       updateStageVisual();
+      checkEmptyLairState();
       syncWithServer();
 
       // If switching to an unlocked dragon that hasn't been given a personal name yet, prompt player!
@@ -13716,10 +13717,18 @@
     }
 
     function quickAddCurrency(type, amount) {
-      if (type === 'sparks') sparksBalance += amount;
+      if (type === 'sparks' || type === 'coins') sparksBalance += amount;
       if (type === 'tears') dragonTearsBalance += amount;
       if (type === 'food') foodCount += amount;
+      if (type === 'eggs') eggsInventory += amount;
+
+      safeSetStorage('sparks_balance', sparksBalance);
+      safeSetStorage('dragon_tears_balance', dragonTearsBalance);
+      safeSetStorage('food_count', foodCount);
+      safeSetStorage('eggs_inventory', eggsInventory);
+
       updateCurrencyUI();
+      syncWithServer();
       showNotice(`➕ Додано +${amount} до балансу!`);
     }
 
@@ -14326,46 +14335,106 @@
     // CLOUD SYNC FOR TELEGRAM BOT (24/7 BACKEND)
     // ==========================================
     window.tgUserId = null;
-    window.cloudStateLoaded = false; // true только после успешной загрузки данных с сервера
     try {
-      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
+      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
         window.tgUserId = Telegram.WebApp.initDataUnsafe.user.id;
-        console.log("Connected Telegram User ID:", window.tgUserId);
+        safeSetStorage('tg_user_id', window.tgUserId);
+        console.log("Connected Telegram User ID from initData:", window.tgUserId);
       }
     } catch (e) {}
 
-    async function loadCloudUserState() {
-      if (!window.tgUserId) return;
+    // Fallback 1: URL parameter (?user_id=... or ?tg_user_id=...)
+    if (!window.tgUserId) {
       try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qId = urlParams.get('user_id') || urlParams.get('tg_user_id');
+        if (qId) {
+          window.tgUserId = parseInt(qId, 10) || qId;
+          safeSetStorage('tg_user_id', window.tgUserId);
+          console.log("Restored Telegram User ID from URL parameter:", window.tgUserId);
+        }
+      } catch (e) {}
+    }
+
+    // Fallback 2: localStorage
+    if (!window.tgUserId) {
+      const savedId = safeGetStorage('tg_user_id');
+      if (savedId) {
+        window.tgUserId = parseInt(savedId, 10) || savedId;
+        console.log("Restored Telegram User ID from localStorage:", window.tgUserId);
+      }
+    }
+
+    // Fallback 3: default test sandbox ID so sync NEVER silently fails
+    if (!window.tgUserId) {
+      window.tgUserId = 777777777;
+      console.log("Using default fallback test tgUserId:", window.tgUserId);
+    }
+
+    async function loadCloudUserState() {
+      if (!window.tgUserId) {
+        console.warn("⚠️ loadCloudUserState: window.tgUserId is null, skipping.");
+        return;
+      }
+      try {
+        console.log(`📡 [loadCloudUserState] Fetching data for user ${window.tgUserId}...`);
         const res = await fetch(`/api/user?user_id=${window.tgUserId}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn(`⚠️ [loadCloudUserState] Server returned ${res.status}`);
+          return;
+        }
         const data = await res.json();
+        console.log(`📥 [loadCloudUserState] Loaded data for user ${window.tgUserId}:`, data);
         if (data && data.user_id) {
-          window.cloudStateLoaded = true;
           sparksBalance = data.coins !== undefined ? data.coins : sparksBalance;
           foodCount = data.food !== undefined ? data.food : foodCount;
           eggsInventory = data.eggs !== undefined ? data.eggs : eggsInventory;
           dragonTearsBalance = data.tears !== undefined ? data.tears : dragonTearsBalance;
           if (data.active_element) currentElement = data.active_element;
           if (data.unlocked_elements) {
-            try { unlockedElements = JSON.parse(data.unlocked_elements); } catch(e){}
+            try {
+              unlockedElements = typeof data.unlocked_elements === 'string' ? JSON.parse(data.unlocked_elements) : data.unlocked_elements;
+            } catch(e){}
           }
           if (data.dragon_names) {
-            try { Object.assign(dragonNames, JSON.parse(data.dragon_names)); } catch(e){}
+            try {
+              const dNames = typeof data.dragon_names === 'string' ? JSON.parse(data.dragon_names) : data.dragon_names;
+              Object.assign(dragonNames, dNames);
+            } catch(e){}
           }
           if (data.named_dragons) {
-            try { Object.assign(namedDragons, JSON.parse(data.named_dragons)); } catch(e){}
+            try {
+              const nDragons = typeof data.named_dragons === 'string' ? JSON.parse(data.named_dragons) : data.named_dragons;
+              Object.assign(namedDragons, nDragons);
+            } catch(e){}
           }
           if (data.dragon_levels) {
-            try { Object.assign(dragonLevels, JSON.parse(data.dragon_levels)); } catch(e){}
+            try {
+              const dLevels = typeof data.dragon_levels === 'string' ? JSON.parse(data.dragon_levels) : data.dragon_levels;
+              Object.assign(dragonLevels, dLevels);
+            } catch(e){}
           }
           if (data.dragon_xp) {
-            try { Object.assign(dragonXP, JSON.parse(data.dragon_xp)); } catch(e){}
+            try {
+              const dXP = typeof data.dragon_xp === 'string' ? JSON.parse(data.dragon_xp) : data.dragon_xp;
+              Object.assign(dragonXP, dXP);
+            } catch(e){}
           }
 
           if (unlockedElements && unlockedElements.length > 0) {
-            activeDragonKey = currentElement || unlockedElements[0];
+            if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
+              activeDragonKey = currentElement || unlockedElements[0] || 'fire';
+            }
           }
+
+          safeSetStorage('sparks_balance', sparksBalance);
+          safeSetStorage('food_count', foodCount);
+          safeSetStorage('eggs_inventory', eggsInventory);
+          safeSetStorage('dragon_tears_balance', dragonTearsBalance);
+          safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
+          safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+          safeSetStorage('active_dragon_key', activeDragonKey);
+
           syncActiveDragonStats();
           checkEmptyLairState();
           updateCurrencyUI();
@@ -14374,68 +14443,48 @@
           updateStageVisual();
         }
       } catch (err) {
-        console.log("Cloud user state load error:", err);
+        console.error("❌ [loadCloudUserState] Cloud user state load error:", err);
       }
     }
 
     function syncWithServer() {
-      if (!window.cloudStateLoaded) return;
-      if (!window.tgUserId) return;
+      if (!window.tgUserId) {
+        console.warn("⚠️ [syncWithServer] window.tgUserId is null, skipping sync.");
+        return;
+      }
+      const payload = {
+        user_id: window.tgUserId,
+        coins: sparksBalance,
+        food: foodCount,
+        eggs: eggsInventory,
+        tears: dragonTearsBalance,
+        active_element: currentElement,
+        unlocked_elements: unlockedElements,
+        dragon_names: dragonNames,
+        named_dragons: namedDragons,
+        dragon_levels: dragonLevels,
+        dragon_xp: dragonXP
+      };
       try {
         fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: window.tgUserId,
-            coins: sparksBalance,
-            food: foodCount,
-            eggs: eggsInventory,
-            tears: dragonTearsBalance,
-            active_element: currentElement,
-            unlocked_elements: unlockedElements,
-            dragon_names: dragonNames,
-            named_dragons: namedDragons,
-            dragon_levels: dragonLevels,
-            dragon_xp: dragonXP
-          })
-        }).catch(e => console.log('Sync error:', e));
-      } catch (e) {}
-    }
-
-    // Подтягиваем с сервера монеты/яйца/драконов, когда игрок возвращается в приложение
-    // (например, выиграл монеты в групповой игре, пока апп был свёрнут).
-    async function refreshCloudBalances() {
-      if (!window.tgUserId || !window.cloudStateLoaded) return;
-      try {
-        const res = await fetch(`/api/user?user_id=${window.tgUserId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data || !data.user_id) return;
-        if (data.coins !== undefined) sparksBalance = data.coins;
-        if (data.food !== undefined) foodCount = data.food;
-        if (data.eggs !== undefined) eggsInventory = data.eggs;
-        if (data.tears !== undefined) dragonTearsBalance = data.tears;
-        if (data.unlocked_elements) {
-          try {
-            const u = JSON.parse(data.unlocked_elements);
-            if (Array.isArray(u)) unlockedElements = u;
-          } catch (e) {}
-        }
-        if (!activeDragonKey && unlockedElements.length > 0) {
-          setElement(data.active_element && unlockedElements.includes(data.active_element) ? data.active_element : unlockedElements[0]);
-        }
-        updateCurrencyUI();
-        updateElementButtonsUI();
-        checkEmptyLairState();
-      } catch (e) { console.log("refreshCloudBalances error:", e); }
-    }
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCloudBalances(); });
-    window.addEventListener('focus', refreshCloudBalances);
-    try {
-      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.onEvent) {
-        Telegram.WebApp.onEvent('activated', refreshCloudBalances);
+          body: JSON.stringify(payload)
+        })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          console.log(`✅ [syncWithServer] Saved successfully for user ${window.tgUserId}:`, data);
+        })
+        .catch(err => {
+          console.error(`❌ [syncWithServer] Sync error for user ${window.tgUserId}:`, err);
+        });
+      } catch (e) {
+        console.error("❌ [syncWithServer] Exception during sync:", e);
       }
-    } catch (e) {}
+    }
 
     // Load cloud state on init
     loadCloudUserState();
@@ -14453,7 +14502,13 @@
     }
 
     function checkEmptyLairState() {
-      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && activeDragonKey);
+      if (unlockedElements && unlockedElements.length > 0) {
+        if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
+          activeDragonKey = unlockedElements[0] || 'fire';
+        }
+        currentElement = activeDragonKey;
+      }
+      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && !!activeDragonKey);
       const overlay = document.getElementById('emptyLairOverlay');
       if (overlay) {
         overlay.style.display = hasUnlocked ? 'none' : 'flex';
@@ -14482,6 +14537,12 @@
         if (feedBtn) { feedBtn.style.opacity = '1.0'; feedBtn.style.cursor = 'pointer'; }
         if (trainBtn) { trainBtn.style.opacity = '1.0'; trainBtn.style.cursor = 'pointer'; }
         if (expeditionBtn) { expeditionBtn.style.opacity = '1.0'; expeditionBtn.style.cursor = 'pointer'; }
+        if (petName) {
+          petName.innerText = (typeof getCurrentDragonName === 'function') ? getCurrentDragonName() : (dragonNames[activeDragonKey] || 'Дракон');
+        }
+        if (stageTitle && (stageTitle.innerText === 'Лігво ще спить' || stageTitle.innerText === 'Порожньо')) {
+          stageTitle.innerText = (typeof getStageName === 'function') ? getStageName(currentLevel) : 'Дорослий Дракон';
+        }
       }
       updateCooldownTimers();
       update360EnvVisibility();
@@ -14554,7 +14615,28 @@
       if (modal) {
         modal.style.display = 'flex';
         modal.style.zIndex = '99999';
+        const input = document.getElementById('adminTgUserIdInput');
+        if (input && window.tgUserId) input.value = window.tgUserId;
+        const statusEl = document.getElementById('adminTgUserStatus');
+        if (statusEl) statusEl.innerText = window.tgUserId ? `ID: ${window.tgUserId}` : "Не прив'язано";
       }
+    }
+
+    function adminBindTgUserId() {
+      const input = document.getElementById('adminTgUserIdInput');
+      if (!input) return;
+      const val = parseInt(input.value.trim(), 10);
+      if (!val || isNaN(val)) {
+        showNotice("⚠️ Введіть коректний числовий Telegram ID!");
+        return;
+      }
+      window.tgUserId = val;
+      safeSetStorage('tg_user_id', val);
+      const statusEl = document.getElementById('adminTgUserStatus');
+      if (statusEl) statusEl.innerText = `ID: ${val}`;
+      showNotice(`✅ Telegram ID ${val} успішно прив'язано! Завантажуємо стан...`);
+      loadCloudUserState();
+      syncWithServer();
     }
 
     function closeAdminDashboard() {
@@ -14569,19 +14651,6 @@
     }
 
     function adminUnlockAllDragons(hatched = true) {
-      try {
-        adminUnlockAllDragonsInner(hatched);
-      } catch (e) {
-        console.error("adminUnlockAllDragons error:", e);
-        showNotice("⚠️ Драконів розблоковано, але частина візуалу не оновилась: " + (e && e.message ? e.message : e));
-      } finally {
-        try { updateElementButtonsUI(); } catch (e) {}
-        try { checkEmptyLairState(); } catch (e) {}
-        syncWithServer(); // обязательно сохраняем на сервер, чтобы бот тоже увидел
-      }
-    }
-
-    function adminUnlockAllDragonsInner(hatched = true) {
       unlockedElements = ['fire', 'storm', 'frost', 'jade'];
       activeDragonKey = 'fire';
       currentElement = 'fire';
@@ -14598,10 +14667,12 @@
       currentLevel = dragonLevels['fire'] || (hatched ? 15 : 1);
       safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
       safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('active_dragon_key', activeDragonKey);
       updateCurrencyUI();
-      checkEmptyLairState();
       setElement('fire');
+      checkEmptyLairState();
       syncActiveDragonStats();
+      applyDragonNameUI();
       updateStageVisual();
       syncWithServer();
       const statusText = hatched ? "на Lv 15 (Дорослі бойові дракони)" : "на Lv 1 (Яйця)";
@@ -14654,6 +14725,7 @@
 
     function adminAddEggs(count) {
       eggsInventory += count;
+      safeSetStorage('eggs_inventory', eggsInventory);
       updateCurrencyUI();
       syncWithServer();
       showNotice(`🥚 Додано +${count} драконячих яєць!`);
@@ -14857,6 +14929,25 @@
       <!-- Modal Body (Scrollable) -->
       <div class="p-4 overflow-y-auto space-y-4">
         
+        <!-- SECTION 0: TELEGRAM USER ID BINDING -->
+        <div class="bg-slate-950/80 border border-blue-500/40 rounded-2xl p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🆔</span> Прив'язка Telegram ID (Синхронізація з ботом)
+            </span>
+            <span id="adminTgUserStatus" class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-200 font-bold border border-blue-500/30">ID: --</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="adminTgUserIdInput" placeholder="Введіть ваш Telegram ID..." class="flex-1 bg-slate-900 border border-slate-700 focus:border-blue-400 rounded-xl px-3 py-1.5 text-xs text-white font-mono outline-none">
+            <button onclick="adminBindTgUserId()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow transition-transform active:scale-95">
+              💾 Зберегти ID
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-400">
+            Введіть свій числовий ID, щоб накручені монети, яйця та дракони відразу були доступні в боті Telegram.
+          </p>
+        </div>
+
         <!-- SECTION 1: GOD MODE & BALANCE CHEATS -->
         <div class="bg-gradient-to-br from-amber-950/30 to-purple-950/30 border border-amber-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
           <div class="flex items-center justify-between">

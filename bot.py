@@ -1,57 +1,24 @@
-import asyncio
-import html
-import json
-import logging
+import os
 import random
-
+import json
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.filters import Command
+from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand
+from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
 from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL
-from database import (
-    get_or_create_user, update_user, reset_user,
-    try_spend_egg, add_food,
-)
-from handlers.bomb_handlers import router as bomb_router
-from handlers.hunt_handlers import router as hunt_router
-from handlers.cities_handlers import router as cities_router
-
-logger = logging.getLogger(__name__)
+from handlers.bomb_handlers import router as bomb_router, cmd_bomb
+from handlers.hunt_handlers import router as hunt_router, cmd_hunt
+from handlers.cities_handlers import router as cities_router, cmd_cities
 
 dp = Dispatcher()
 dp.include_router(bomb_router)
 dp.include_router(hunt_router)
 dp.include_router(cities_router)
 
-HTML = "HTML"
-
-# Блокировка на пользователя: не даёт крутить рулетку двумя кликами одновременно
-_user_locks: dict[int, asyncio.Lock] = {}
-
-
-def _lock_for(uid: int) -> asyncio.Lock:
-    return _user_locks.setdefault(uid, asyncio.Lock())
-
-
-def _who(message: types.Message, from_user: types.User | None = None):
-    """Возвращает (id, username, имя) НАСТОЯЩЕГО пользователя.
-
-    Важно: когда нажимают инлайн-кнопку, query.message — это сообщение БОТА,
-    поэтому message.from_user там = бот. Для кнопок передаём query.from_user отдельно.
-    """
-    u = from_user or message.from_user
-    if u:
-        return u.id, (u.username or ""), (u.first_name or "Володар")
-    return message.chat.id, "", "Володар"
-
-
-def _is_group(message: types.Message) -> bool:
-    return message.chat.type in ("group", "supergroup")
-
-
 def get_main_keyboard(is_group: bool = False):
-    # В группах Telegram запрещает web_app-кнопки, поэтому там обычная ссылка
+    # Telegram strictly forbids 'web_app' inline buttons in groups!
+    # In groups we send standard url= link, in private chat we send web_app=
     if is_group:
         lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=TG_APP_URL)
     else:
@@ -64,7 +31,6 @@ def get_main_keyboard(is_group: bool = False):
             InlineKeyboardButton(text="👤 Мій Профіль", callback_data="show_profile")
         ]
     ])
-
 
 def is_text_trigger(text: str, triggers: list) -> bool:
     if not text:
@@ -79,15 +45,6 @@ def is_text_trigger(text: str, triggers: list) -> bool:
         if clean == trig.lower() or no_punct == t_clean or compact == t_compact:
             return True
     return False
-
-
-async def _report_error(message: types.Message, name: str):
-    logger.exception("%s error", name)
-    try:
-        await message.answer("⚠️ Щось пішло не так. Спробуйте ще раз трохи пізніше.")
-    except Exception:
-        pass
-
 
 async def setup_bot_commands(bot: Bot):
     commands = [
@@ -106,20 +63,21 @@ async def setup_bot_commands(bot: Bot):
     try:
         await bot.set_my_commands(commands)
     except Exception as e:
-        logger.warning("Could not set bot commands: %s", e)
-
+        print("Could not set bot commands:", e)
 
 START_COMMANDS = ["start", "startdragon", "dragonstart", "start_dragon"]
 
-
 @dp.message(Command(*START_COMMANDS))
-async def cmd_start(message: types.Message, from_user: types.User | None = None):
+@dp.message(CommandStart())
+async def cmd_start(message: types.Message):
     try:
-        uid, uname, fname = _who(message, from_user)
+        uid = message.from_user.id if message.from_user else message.chat.id
+        uname = (message.from_user.username or "") if message.from_user else ""
+        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
         user = await get_or_create_user(uid, uname, fname)
         unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
-
+        
         status_dragon = "🔒 Ще немає (Лігво спить)"
         if unlocked:
             elem_names = {
@@ -131,62 +89,63 @@ async def cmd_start(message: types.Message, from_user: types.User | None = None)
             names = json.loads(user['dragon_names']) if user.get('dragon_names') else {}
             active = user.get('active_element') or unlocked[0]
             custom_name = names.get(active, "Дракон")
-            status_dragon = f"{elem_names.get(active, '🐉')} <b>«{html.escape(str(custom_name))}»</b>"
+            status_dragon = f"{elem_names.get(active, '🐉')} **«{custom_name}»**"
 
         welcome_text = (
-            f"🏰 Вітаємо у <b>«Лігві Дракона»</b>, {html.escape(fname)}!\n\n"
+            f"🏰 Вітаємо у **«Лігві Дракона»**, {fname}!\n\n"
             f"✨ Це магічний світ, де ви зрощуєте та тренуєте живих 3D-драконів!\n\n"
-            f"👛 <b>Ваш інвентар:</b>\n"
-            f"🪙 Монети: <b>{user['coins']}</b>\n"
-            f"💧 Сльози дракона: <b>{user['tears']}</b>\n"
-            f"🍖 Смаколики (їжа): <b>{user['food']}</b>\n"
-            f"🥚 Драконячі яйця: <b>{user['eggs']}</b>\n\n"
-            f"🐉 <b>Ваш дракон:</b> {status_dragon}\n\n"
+            f"👛 **Ваш інвентар:**\n"
+            f"🪙 Монети: **{user['coins']}**\n"
+            f"💧 Сльози дракона: **{user['tears']}**\n"
+            f"🍖 Смаколики (їжа): **{user['food']}**\n"
+            f"🥚 Драконячі яйця: **{user['eggs']}**\n\n"
+            f"🐉 **Ваш дракон:** {status_dragon}\n\n"
         )
 
         if not unlocked:
             welcome_text += (
-                "🥚 <b>Ваше Лігво ще порожнє!</b>\n"
+                "🥚 **Ваше Лігво ще порожнє!**\n"
                 "У вас ще немає жодного дракона. Відкрийте або знайдіть свого першого дракона, щоб увійти до лігва!\n\n"
             )
         else:
-            welcome_text += "🎮 Натискайте <b>🐉 Увійти в Лігво</b>, щоб тренувати та милуватися своїм драконом!\n\n"
+            welcome_text += "🎮 Натискайте **🐉 Увійти в Лігво**, щоб тренувати та милуватися своїм драконом!\n\n"
 
         welcome_text += (
-            "🎮 <b>Швидкі команди:</b>\n"
-            "• <code>/bomb</code> або <code>!бомба</code> — Гра «Бомба» (слова, склади, монети, їжа та яйця!)\n"
-            "• <code>/movie</code> або <code>!фільм</code> — Гра «Вгадай фільм / гру» (постери та дешифровка)\n"
-            "• <code>/cities</code> або <code>!міста</code> — Гра «Міста Дракона» (географічна битва)\n"
-            "• <code>/roulette</code> або <code>!рулетка</code> — Крутити рулетку яєць\n"
-            "• <code>/lair</code> або <code>!моєлігво</code> — Відкрити 3D Лігво Дракона\n"
-            "• <code>/profile</code> — Особистий профіль володаря драконів"
+            "🎮 **Швидкі команди:**\n"
+            "• `/bomb` або `!бомба` — Гра «Бомба» (слова, склади, монети, їжа та яйця!)\n"
+            "• `/movie` або `!фільм` — Гра «Вгадай фільм / гру» (постери та дешифровка)\n"
+            "• `/cities` або `!міста` — Гра «Міста Дракона» (географічна битва)\n"
+            "• `/roulette` або `!рулетка` — Крутити рулетку яєць\n"
+            "• `/lair` або `!моєлігво` — Відкрити 3D Лігво Дракона\n"
+            "• `/profile` — Особистий профіль володаря драконів"
         )
 
-        await message.answer(welcome_text, parse_mode=HTML, reply_markup=get_main_keyboard(is_group=_is_group(message)))
-    except Exception:
-        await _report_error(message, "cmd_start")
+        is_group = message.chat.type in ["group", "supergroup"]
+        await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+    except Exception as e:
+        print("cmd_start error:", e)
 
-
-LAIR_COMMANDS = ["lair", "dragon", "дракон", "лігво", "моєлігво"]
+LAIR_COMMANDS = ["lair", "dragon", "дракон", "лігво", "моєлігво", "startdragon"]
 LAIR_TRIGGERS = ["!моєлігво", "!моє лігво", "моєлігво", "моє лігво", "!лігво", "лігво", "!lair", "lair"]
-
 
 @dp.message(Command(*LAIR_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, LAIR_TRIGGERS)))
-async def cmd_lair(message: types.Message, from_user: types.User | None = None):
+async def cmd_lair(message: types.Message):
     try:
-        uid, uname, fname = _who(message, from_user)
+        uid = message.from_user.id if message.from_user else message.chat.id
+        uname = (message.from_user.username or "") if message.from_user else ""
+        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
         user = await get_or_create_user(uid, uname, fname)
         unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
-        is_group = _is_group(message)
+        is_group = message.chat.type in ["group", "supergroup"]
 
         if not unlocked:
             await message.answer(
-                "🏰 <b>Ваше Лігво ще спить і порожнє!</b> 🥚\n\n"
+                "🏰 **Ваше Лігво ще спить і порожнє!** 🥚\n\n"
                 "У вас ще немає жодного дракона чи магічного яйця.\n"
-                "Зіграйте в <code>/bomb</code> або <code>/movie</code>, вибийте яйце та запустіть <code>/roulette</code>!",
-                parse_mode=HTML,
+                "Зіграйте в `/bomb` або `/movie`, вибийте яйце та запустіть `/roulette`!",
+                parse_mode="Markdown",
                 reply_markup=get_main_keyboard(is_group=is_group)
             )
             return
@@ -197,187 +156,166 @@ async def cmd_lair(message: types.Message, from_user: types.User | None = None):
             open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=WEBAPP_URL))
 
         await message.answer(
-            "🏰 <b>Вхід до вашого гнізда драконів:</b>\nНатисніть кнопку нижче, щоб відкрити світ драконів:",
-            parse_mode=HTML,
+            "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити світ драконів:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[open_btn]])
         )
-    except Exception:
-        await _report_error(message, "cmd_lair")
-
+    except Exception as e:
+        print("cmd_lair error:", e)
 
 ROULETTE_COMMANDS = ["roulette", "roulettedragon", "рулетка"]
 ROULETTE_TRIGGERS = ["!рулетка", "рулетка", "!рулеька", "рулеька", "!roulette", "roulette"]
 
-NO_EGGS_TEXT = (
-    "❌ <b>У вас немає яєць для рулетки!</b> (Потрібно 1 🥚)\n\n"
-    "💡 <b>Як отримати яйце:</b>\n"
-    "• Грайте в <code>/bomb</code> або <code>/movie</code> (10% шанс вибити драконяче яйце)!\n"
-    "• Отримуйте нагороди за активність у чаті."
-)
-
-
 @dp.message(Command(*ROULETTE_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, ROULETTE_TRIGGERS)))
-async def cmd_roulette(message: types.Message, from_user: types.User | None = None):
+async def cmd_roulette(message: types.Message):
     try:
-        uid, uname, fname = _who(message, from_user)
-        is_group = _is_group(message)
+        uid = message.from_user.id if message.from_user else message.chat.id
+        uname = (message.from_user.username or "") if message.from_user else ""
+        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
-        async with _lock_for(uid):
-            user = await get_or_create_user(uid, uname, fname)
+        user = await get_or_create_user(uid, uname, fname)
+        is_group = message.chat.type in ["group", "supergroup"]
 
-            # Яйце списывается атомарно: если его нет — списание не пройдёт
-            if user['eggs'] < 1 or not await try_spend_egg(uid):
-                await message.answer(NO_EGGS_TEXT, parse_mode=HTML, reply_markup=get_main_keyboard(is_group=is_group))
-                return
+        if user['eggs'] < 1:
+            await message.answer(
+                f"❌ **У вас немає яєць для рулетки!** (Потрібно 1 🥚)\n\n"
+                f"💡 **Як отримати яйце:**\n"
+                f"• Грайте в `/bomb` або `/movie` (10% шанс вибити драконяче яйце)!\n"
+                f"• Отримуйте нагороди за активність у чаті.",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard(is_group=is_group)
+            )
+            return
 
-            elements = ['fire', 'storm', 'frost', 'jade']
-            elem_names = {
-                'fire': "🔥 Вогняного Дракона (Typhoomerang)",
-                'storm': "⚡ Штормового Дракона (Flightmare)",
-                'frost': "❄️ Крижаного Дракона (Dreamdragon)",
-                'jade': "🎋 Нефритового Дракона (Singetail)"
-            }
+        await update_user(user['user_id'], eggs=user['eggs'] - 1)
 
-            won_elem = random.choice(elements)
-            unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
-            levels = json.loads(user['dragon_levels']) if user.get('dragon_levels') else {}
+        elements = ['fire', 'storm', 'frost', 'jade']
+        elem_names = {
+            'fire': "🔥 Вогняного Дракона (Typhoomerang)",
+            'storm': "⚡ Штормового Дракона (Flightmare)",
+            'frost': "❄️ Крижаного Дракона (Dreamdragon)",
+            'jade': "🎋 Нефритового Дракона (Singetail)"
+        }
 
-            if won_elem in unlocked:
-                await add_food(uid, 5)
-                text = (
-                    f"🎰 <b>Рулетка прокручена!</b> (-1 🥚)\n\n"
-                    f"✨ Випала стихія: <b>{elem_names[won_elem]}</b>!\n"
-                    f"ℹ️ У вас вже є цей дракон. Компенсація: <b>+5 🍖 смаколиків</b>!"
-                )
-            else:
-                unlocked.append(won_elem)
-                levels.setdefault(won_elem, 1)
-                fields = {"unlocked_elements": unlocked, "dragon_levels": levels}
-                if not user.get('active_element'):
-                    fields["active_element"] = won_elem
-                await update_user(uid, **fields)
-                text = (
-                    f"🎰 <b>РУЛЕТКА ПРОКРУЧЕНА!</b> (-1 🥚)\n\n"
-                    f"🎉 <b>НЕЙМОВІРНО! ВИ ВІДКРИЛИ НОВОГО ДРАКОНА!</b>\n"
-                    f"🐉 Стихія: <b>{elem_names[won_elem]}</b>\n\n"
-                    f"Тепер він доступний у вашому лігві! Перейдіть у меню та познайомтеся зі своїм новим улюбленцем."
-                )
+        won_elem = random.choice(elements)
+        unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
+        levels = json.loads(user['dragon_levels']) if user.get('dragon_levels') else {}
 
-        await message.answer(text, parse_mode=HTML, reply_markup=get_main_keyboard(is_group=is_group))
-    except Exception:
-        await _report_error(message, "cmd_roulette")
+        is_duplicate = won_elem in unlocked
 
+        if is_duplicate:
+            await update_user(user['user_id'], food=user['food'] + 5)
+            text = (
+                f"🎰 **Рулетка прокручена!** (-1 🥚)\n\n"
+                f"✨ Випала стихія: **{elem_names[won_elem]}**!\n"
+                f"ℹ️ У вас вже є цей дракон. Компенсація: **+5 🍖 смаколиків**!"
+            )
+        else:
+            unlocked.append(won_elem)
+            if not user.get('active_element'):
+                await update_user(user['user_id'], active_element=won_elem)
+            if won_elem not in levels:
+                levels[won_elem] = 1
+            await update_user(
+                user['user_id'],
+                unlocked_elements=json.dumps(unlocked),
+                dragon_levels=json.dumps(levels)
+            )
+            text = (
+                f"🎰 **РУЛЕТКА ПРОКРУЧЕНА!** (-1 🥚)\n\n"
+                f"🎉 **НЕЙМОВІРНО! ВИ ВІДКРИЛИ НОВОГО ДРАКОНА!**\n"
+                f"🐉 Стихія: **{elem_names[won_elem]}**\n\n"
+                f"Тепер він доступний у вашому лігві! Перейдіть у меню та познайомтеся зі своїм новим улюбленцем."
+            )
+
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+    except Exception as e:
+        print("cmd_roulette error:", e)
 
 PROFILE_COMMANDS = ["profile", "profildragon", "profiledragon", "dragonprofile", "профіль", "профиль"]
 PROFILE_TRIGGERS = ["!профіль", "профіль", "!профиль", "профиль", "!profildragon", "!profile", "profildragon", "profile"]
 
-
 @dp.message(Command(*PROFILE_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, PROFILE_TRIGGERS)))
-async def cmd_profile(message: types.Message, from_user: types.User | None = None):
+async def cmd_profile(message: types.Message):
     try:
-        uid, uname, fname = _who(message, from_user)
+        uid = message.from_user.id if message.from_user else message.chat.id
+        uname = (message.from_user.username or "") if message.from_user else ""
+        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
         user = await get_or_create_user(uid, uname, fname)
         unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
         names = json.loads(user['dragon_names']) if user.get('dragon_names') else {}
         levels = json.loads(user['dragon_levels']) if user.get('dragon_levels') else {}
+        is_group = message.chat.type in ["group", "supergroup"]
 
         elem_icons = {'fire': '🔥', 'storm': '⚡', 'frost': '❄️', 'jade': '🎋'}
-        active = user.get('active_element') or ''
-
+        active = user.get('active_element', '')
+        
         if active and active in unlocked:
-            active_name = html.escape(str(names.get(active, "Дракон")))
+            active_name = names.get(active, "Дракон")
             active_lvl = levels.get(active, 1)
-            active_str = f"{elem_icons.get(active, '🐉')} <b>«{active_name}»</b> (Lv {active_lvl})"
+            active_str = f"{elem_icons.get(active, '🐉')} **«{active_name}»** (Lv {active_lvl})"
         else:
             active_str = "🔒 Ще немає (Лігво спить)"
 
         dragons_detail = ""
         if unlocked:
-            dragons_detail = "\n🐉 <b>Рівні ваших драконів:</b>\n"
+            dragons_detail = "\n🐉 **Рівні ваших драконів:**\n"
             for el in unlocked:
                 el_icon = elem_icons.get(el, '🐉')
-                el_name = html.escape(str(names.get(el, el.capitalize())))
+                el_name = names.get(el, el.capitalize())
                 el_lvl = levels.get(el, 1)
-                marker = " <i>(активний)</i>" if el == active else ""
-                dragons_detail += f"• {el_icon} {el_name}: <b>Рівень {el_lvl}</b>{marker}\n"
+                marker = " *(активний)*" if el == active else ""
+                dragons_detail += f"• {el_icon} {el_name}: **Рівень {el_lvl}**{marker}\n"
 
         text = (
-            f"👤 <b>Профіль володаря драконів ({html.escape(fname)}):</b>\n\n"
-            f"🪙 Монети: <b>{user['coins']}</b>\n"
-            f"💧 Сльози дракона: <b>{user['tears']}</b>\n"
-            f"🍖 Смаколики: <b>{user['food']} шт</b>\n"
-            f"🥚 Драконячі яйця: <b>{user['eggs']} шт</b>\n\n"
-            f"🐉 <b>Активний дракон:</b> {active_str}\n"
-            f"🔓 Відкрито стихій: <b>{len(unlocked)} / 4</b>\n"
+            f"👤 **Профіль володаря драконів ({fname}):**\n\n"
+            f"🪙 Монети: **{user['coins']}**\n"
+            f"💧 Сльози дракона: **{user['tears']}**\n"
+            f"🍖 Смаколики: **{user['food']} шт**\n"
+            f"🥚 Драконячі яйця: **{user['eggs']} шт**\n\n"
+            f"🐉 **Активний дракон:** {active_str}\n"
+            f"🔓 Відкрито стихій: **{len(unlocked)} / 4**\n"
             f"{dragons_detail}"
         )
-        await message.answer(text, parse_mode=HTML, reply_markup=get_main_keyboard(is_group=_is_group(message)))
-    except Exception:
-        await _report_error(message, "cmd_profile")
-
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group))
+    except Exception as e:
+        print("cmd_profile error:", e)
 
 @dp.message(Command("reset"))
 async def cmd_reset(message: types.Message):
-    """Сброс теперь с подтверждением, чтобы случайно не стереть весь прогресс."""
     try:
-        uid, _, _ = _who(message)
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Так, скинути все", callback_data=f"reset_yes:{uid}"),
-            InlineKeyboardButton(text="❌ Скасувати", callback_data=f"reset_no:{uid}"),
-        ]])
+        uid = message.from_user.id if message.from_user else message.chat.id
+        await reset_user(uid)
+        is_group = message.chat.type in ["group", "supergroup"]
         await message.answer(
-            "⚠️ <b>Скинути профіль повністю?</b>\n"
-            "Монети, яйця, їжа та всі дракони будуть видалені. Це не можна скасувати!",
-            parse_mode=HTML,
-            reply_markup=kb,
+            "🔄 **Ваш профіль повністю скинуто до нуля!**\n"
+            "У вас тепер 0 монет, 0 яєць, 0 драконів — стан чистого нового гравця.\n"
+            "Спробуйте надіслати `/start` або `!моєлігво`.",
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(is_group=is_group)
         )
-    except Exception:
-        await _report_error(message, "cmd_reset")
+    except Exception as e:
+        print("cmd_reset error:", e)
 
+# Callback queries handlers
+@dp.callback_query(F.data == "play_bomb")
+async def cb_bomb(query: types.CallbackQuery):
+    await query.answer()
+    await cmd_bomb(query.message)
 
-@dp.callback_query(F.data.startswith("reset_yes:"))
-async def cb_reset_yes(query: types.CallbackQuery):
-    owner = int(query.data.split(":")[1])
-    if query.from_user.id != owner:
-        await query.answer("Це не ваша кнопка 🙂", show_alert=True)
-        return
-    await reset_user(owner)
-    await query.answer("Готово!")
-    try:
-        await query.message.edit_text(
-            "🔄 <b>Профіль скинуто до нуля.</b>\nСпробуйте надіслати <code>/start</code>.",
-            parse_mode=HTML,
-        )
-    except Exception:
-        pass
-
-
-@dp.callback_query(F.data.startswith("reset_no:"))
-async def cb_reset_no(query: types.CallbackQuery):
-    owner = int(query.data.split(":")[1])
-    if query.from_user.id != owner:
-        await query.answer("Це не ваша кнопка 🙂", show_alert=True)
-        return
-    await query.answer("Скасовано")
-    try:
-        await query.message.edit_text("👌 Скидання скасовано.")
-    except Exception:
-        pass
-
-
-# ---------- Обработчики кнопок ----------
-# ВАЖНО: передаём query.from_user — того, кто реально нажал кнопку.
+@dp.callback_query(F.data == "play_movie")
+async def cb_movie(query: types.CallbackQuery):
+    await query.answer()
+    await cmd_hunt(query.message)
 
 @dp.callback_query(F.data == "play_roulette")
 async def cb_roulette(query: types.CallbackQuery):
     await query.answer()
-    await cmd_roulette(query.message, from_user=query.from_user)
-
+    await cmd_roulette(query.message)
 
 @dp.callback_query(F.data == "show_profile")
 async def cb_profile(query: types.CallbackQuery):
     await query.answer()
-    await cmd_profile(query.message, from_user=query.from_user)
+    await cmd_profile(query.message)
