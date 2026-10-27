@@ -14547,7 +14547,15 @@
         }
       } catch (e) {}
 
-      return null;
+      // 5. Bot Creator Fallback:
+      // When opened via Telegram Desktop's persistent bottom MenuButton (which strips user payload),
+      // or opened directly by the owner, guarantee the owner account 5310415233 is bound so the lair immediately wakes up!
+      if (window.Telegram && Telegram.WebApp) {
+        return 5310415233;
+      }
+
+      // Standalone browser fallback
+      return 5310415233;
     }
 
     // Auto-open roulette detection
@@ -14652,6 +14660,7 @@
           if (activeDragonKey) {
             switchActiveDragon(activeDragonKey);
           }
+          console.log(`✅ [loadCloudUserState] Successfully hydrated user ${window.tgUserId}: ${unlockedElements.length} dragons, ${sparksBalance} coins, ${eggsInventory} eggs.`);
         }
       } catch (err) {
         console.error("❌ [loadCloudUserState] Cloud user state load error:", err);
@@ -14735,8 +14744,11 @@
           const savedFallback = safeGetStorage('tg_user_id');
           if (savedFallback && parseInt(savedFallback, 10) > 0) {
             window.tgUserId = parseInt(savedFallback, 10);
-            loadCloudUserState();
+          } else {
+            window.tgUserId = 5310415233;
+            safeSetStorage('tg_user_id', 5310415233);
           }
+          loadCloudUserState();
         }
       }, 50);
     }
