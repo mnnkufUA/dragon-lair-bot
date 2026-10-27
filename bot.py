@@ -87,6 +87,37 @@ START_COMMANDS = ["start", "startdragon", "dragonstart", "start_dragon"]
 MYID_COMMANDS = ["myid", "id", "айди", "мойайди"]
 MYID_TRIGGERS = ["!id", "!айди", "айди", "id", "!myid", "мій id", "мой id", "!мійid", "!мойid"]
 
+@dp.message(Command("admin", "godmode", "giveall"))
+async def cmd_admin_godmode(message: types.Message):
+    try:
+        uid = message.from_user.id if message.from_user else message.chat.id
+        if uid == 5310415233:
+            await update_user(
+                uid,
+                coins=10000,
+                food=50,
+                eggs=99,
+                tears=100,
+                active_element="fire",
+                unlocked_elements=["fire", "storm", "frost", "jade"],
+                dragon_levels={"fire": 1, "storm": 1, "frost": 1, "jade": 1}
+            )
+            await message.answer(
+                "👑 <b>Режим розробника активовано!</b>\n\n"
+                "✅ <b>Всі 4 дракони розблоковано:</b> Вогонь, Гроза, Лід, Смарагд (Lv 1)\n"
+                "🪙 Монети: <b>10 000</b>\n"
+                "🥚 Драконячі яйця: <b>99 шт</b>\n"
+                "🍖 Смаколики: <b>50 шт</b>\n"
+                "💧 Сльози дракона: <b>100</b>\n\n"
+                "Натисніть кнопку <b>«🐉 Лігво»</b> внизу для входу!",
+                reply_markup=get_lair_inline_keyboard(uid),
+                parse_mode="HTML"
+            )
+        else:
+            await message.answer("❌ Ця команда доступна лише розробнику.")
+    except Exception as e:
+        print("cmd_admin_godmode error:", e)
+
 @dp.message(Command(*MYID_COMMANDS))
 @dp.message(F.text.func(lambda text: is_text_trigger(text, MYID_TRIGGERS)))
 async def cmd_myid(message: types.Message):

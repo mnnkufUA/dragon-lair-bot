@@ -32,6 +32,23 @@ def _init_db_sync():
             conn.execute("ALTER TABLE users ADD COLUMN has_started INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+
+        # Seed owner account 5310415233 so cold restart on Render never wipes progress
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM users WHERE user_id = 5310415233")
+        if not cur.fetchone():
+            default_unlocked = json.dumps(["fire", "storm", "frost", "jade"])
+            default_names = json.dumps({"fire": "Сонячне Полум'я", "storm": "Флайтмейр", "frost": "Дрімдракон", "jade": "Синґтейл"}, ensure_ascii=False)
+            default_named = json.dumps({"fire": False, "storm": False, "frost": False, "jade": False})
+            default_levels = json.dumps({"fire": 1, "storm": 1, "frost": 1, "jade": 1})
+            default_xp = json.dumps({"fire": 0, "storm": 0, "frost": 0, "jade": 0})
+            conn.execute("""
+                INSERT INTO users (
+                    user_id, username, first_name, coins, food, eggs, tears,
+                    active_element, unlocked_elements, dragon_names, named_dragons,
+                    dragon_levels, dragon_xp, last_train, last_expedition
+                ) VALUES (5310415233, 'mnnkufUA', 'Володар', 10000, 50, 99, 100, 'fire', ?, ?, ?, ?, ?, 0, 0)
+            """, (default_unlocked, default_names, default_named, default_levels, default_xp))
         conn.commit()
 
 async def init_db():
