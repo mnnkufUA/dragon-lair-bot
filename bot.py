@@ -296,7 +296,8 @@ async def cmd_profile(message: types.Message, user_override: types.User = None):
             f"🔓 Відкрито стихій: **{len(unlocked)} / 4**\n"
             f"{dragons_detail}"
         )
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
+        has_started = bool(user.get("has_started", 0)) if is_group else True
+        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid, has_started=has_started))
     except Exception as e:
         print("cmd_profile error:", e)
 
