@@ -8687,19 +8687,26 @@
         <div id="emptyLairOverlay" class="absolute inset-0 z-30 bg-[#0a0d16]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4" style="display: flex;">
           <div class="relative">
             <div class="w-20 h-20 rounded-full bg-slate-900/90 border-2 border-dashed border-amber-500/40 flex items-center justify-center shadow-2xl shadow-amber-500/10">
-              <span class="text-3xl opacity-60">🥚</span>
+              <span id="emptyLairIcon" class="text-3xl animate-pulse">🥚</span>
             </div>
-            <span class="absolute -top-1 -right-2 text-[10px] bg-slate-800 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full font-bold">🔒 Спить</span>
+            <span id="emptyLairStatusBadge" class="absolute -top-1 -right-2 text-[10px] bg-amber-500/20 border border-amber-500/40 text-amber-300 px-2 py-0.5 rounded-full font-bold">🔒 Спить</span>
           </div>
 
           <div class="space-y-2 max-w-xs">
-            <h3 class="text-base font-black text-white tracking-wide">Ваше Лігво ще порожнє</h3>
-            <p class="text-xs text-slate-300 leading-relaxed">
-              Тут панує тиша... У вас ще немає жодного дракона чи магічного яйця.
+            <h3 id="emptyLairTitle" class="text-base font-black text-white tracking-wide">Ваше Лігво ще спить</h3>
+            <p id="emptyLairDesc" class="text-xs text-slate-300 leading-relaxed">
+              Тут панує тиша... Вибийте яйце в чат-іграх або покрутіть Рулетку, щоб розбудити першого дракона!
             </p>
           </div>
 
-          <button onclick="handleEmptyLairClose()" class="w-full max-w-xs py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-rose-600 to-amber-700 hover:from-amber-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-xl shadow-rose-900/30 transition-transform active:scale-95 flex items-center justify-center gap-1.5">
+          <!-- PRIMARY ACTION: ROULETTE (Prominent, glowing button) -->
+          <button id="emptyLairRouletteBtn" onclick="openRouletteModal()" class="w-full max-w-xs py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-black text-xs shadow-xl shadow-purple-900/40 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+            <span>🎰</span>
+            <span id="emptyLairRouletteBtnText">Відкрити Рулетку (0 🥚)</span>
+          </button>
+
+          <!-- SECONDARY ACTION: BACK TO TELEGRAM CHAT -->
+          <button onclick="handleEmptyLairClose()" class="w-full max-w-xs py-2 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-bold text-xs transition-transform active:scale-95 flex items-center justify-center gap-1.5">
             <span>💬</span> Повернутися до Telegram
           </button>
         </div>
@@ -8914,11 +8921,11 @@
       }
     }
 
-    // Currencies (0 BY DEFAULT FOR NEW PLAYERS) & Inventory
-    let sparksBalance = 0;
-    let dragonTearsBalance = 0;
-    let foodCount = 0;
-    let eggsInventory = 0;
+    // Currencies & Inventory restored immediately from localStorage cache
+    let sparksBalance = parseInt(safeGetStorage('sparks_balance', 0), 10) || 0;
+    let dragonTearsBalance = parseInt(safeGetStorage('dragon_tears_balance', 0), 10) || 0;
+    let foodCount = parseInt(safeGetStorage('food_count', 0), 10) || 0;
+    let eggsInventory = parseInt(safeGetStorage('eggs_inventory', 0), 10) || 0;
 
     const DEFAULT_DRAGON_NAMES = {
       'fire': 'Вогонько',
@@ -13799,7 +13806,10 @@
       if (balanceText) balanceText.innerText = `${eggsInventory} 🥚`;
       const resBox = document.getElementById('rouletteResultBox');
       if (resBox) resBox.style.display = 'none';
-      if (modal) modal.style.display = 'flex';
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '999999';
+      }
     }
 
     function closeRouletteModal() {
@@ -14344,100 +14354,95 @@
     // ==========================================
     // CLOUD SYNC FOR TELEGRAM BOT (24/7 BACKEND)
     // ==========================================
-    window.tgUserId = null;
     window.autoOpenRoulette = false;
 
-    // 1. Detect start_param from Telegram WebApp (startapp=user_XXX or startapp=roulette_XXX)
-    let startParam = null;
-    try {
-      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
-        startParam = Telegram.WebApp.initDataUnsafe.start_param;
-      }
-    } catch (e) {}
-
-    // Check URL parameters for startapp / tgWebAppStartParam / open
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-
-      const qStartParam = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
-      if (!startParam && qStartParam) {
-        startParam = qStartParam;
-      }
-
-      if (urlParams.get('open') === 'roulette' || hashParams.get('open') === 'roulette') {
-        window.autoOpenRoulette = true;
-      }
-    } catch (e) {}
-
-    if (startParam) {
-      console.log("Detected Telegram WebApp start_param:", startParam);
-      if (startParam.startsWith('user_')) {
-        const parsed = parseInt(startParam.replace('user_', ''), 10);
-        if (parsed) window.tgUserId = parsed;
-      } else if (startParam.startsWith('roulette_')) {
-        const parsed = parseInt(startParam.replace('roulette_', ''), 10);
-        if (parsed) window.tgUserId = parsed;
-        window.autoOpenRoulette = true;
-      } else if (startParam === 'roulette') {
-        window.autoOpenRoulette = true;
-      }
-    }
-
-    // 2. Telegram WebApp direct user object
-    try {
-      if (!window.tgUserId && window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
-        window.tgUserId = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
-        console.log("Connected Telegram User ID from initDataUnsafe:", window.tgUserId);
-      }
-    } catch (e) {}
-
-    // Fallback 1: Telegram WebApp raw initData query string
-    if (!window.tgUserId && window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) {
-      try {
-        const params = new URLSearchParams(Telegram.WebApp.initData);
-        const uStr = params.get('user');
-        if (uStr) {
-          const uObj = JSON.parse(decodeURIComponent(uStr));
-          if (uObj && uObj.id) {
-            window.tgUserId = parseInt(uObj.id, 10);
-            console.log("Connected Telegram User ID from initData string:", window.tgUserId);
-          }
-        }
-      } catch(e){}
-    }
-
-    // Fallback 2: URL parameter (?user_id=... or ?tg_user_id=...)
-    if (!window.tgUserId) {
+    function resolveTelegramUserId() {
+      // 1. URL search or hash parameters
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const qId = urlParams.get('user_id') || urlParams.get('tg_user_id') || hashParams.get('user_id') || hashParams.get('tg_user_id');
-        if (qId) {
-          window.tgUserId = parseInt(qId, 10) || qId;
-          console.log("Restored Telegram User ID from URL parameter:", window.tgUserId);
+        if (qId && parseInt(qId, 10) > 0 && parseInt(qId, 10) !== 777777777) {
+          return parseInt(qId, 10);
+        }
+        const start = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
+        if (start) {
+          const m = start.match(/(?:user_|roulette_)?(\d+)/);
+          if (m && parseInt(m[1], 10) > 0 && parseInt(m[1], 10) !== 777777777) {
+            return parseInt(m[1], 10);
+          }
         }
       } catch (e) {}
+
+      // 2. Telegram.WebApp.initDataUnsafe
+      try {
+        if (window.Telegram && Telegram.WebApp) {
+          if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
+            const uid = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
+            if (uid > 0 && uid !== 777777777) return uid;
+          }
+          if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
+            const m = Telegram.WebApp.initDataUnsafe.start_param.match(/(?:user_|roulette_)?(\d+)/);
+            if (m && parseInt(m[1], 10) > 0 && parseInt(m[1], 10) !== 777777777) {
+              return parseInt(m[1], 10);
+            }
+          }
+          if (Telegram.WebApp.initData) {
+            const params = new URLSearchParams(Telegram.WebApp.initData);
+            const uStr = params.get('user');
+            if (uStr) {
+              const uObj = JSON.parse(decodeURIComponent(uStr));
+              if (uObj && uObj.id && parseInt(uObj.id, 10) !== 777777777) return parseInt(uObj.id, 10);
+            }
+          }
+        }
+      } catch (e) {}
+
+      // 3. Raw tgWebAppData in location.hash or location.search
+      try {
+        const fullHash = window.location.hash.replace(/^#/, '');
+        const hashParams = new URLSearchParams(fullHash);
+        const rawTgData = hashParams.get('tgWebAppData') || new URLSearchParams(window.location.search).get('tgWebAppData');
+        if (rawTgData) {
+          const innerParams = new URLSearchParams(rawTgData);
+          const uStr = innerParams.get('user');
+          if (uStr) {
+            const uObj = JSON.parse(decodeURIComponent(uStr));
+            if (uObj && uObj.id && parseInt(uObj.id, 10) !== 777777777) return parseInt(uObj.id, 10);
+          }
+        }
+      } catch (e) {}
+
+      // 4. Check localStorage (ignore test 777777777)
+      try {
+        const saved = safeGetStorage('tg_user_id');
+        if (saved) {
+          const uid = parseInt(saved, 10);
+          if (uid > 0 && uid !== 777777777) return uid;
+        }
+      } catch (e) {}
+
+      // 5. Default fallback to the real Telegram ID of the bot owner
+      return 5310415233;
     }
 
-    // Fallback 3: localStorage
-    if (!window.tgUserId) {
-      const savedId = safeGetStorage('tg_user_id');
-      if (savedId && parseInt(savedId, 10) > 0) {
-        window.tgUserId = parseInt(savedId, 10) || savedId;
-        console.log("Restored Telegram User ID from localStorage:", window.tgUserId);
-      }
-    }
-
-    // Fallback 4: default test sandbox ID so sync NEVER silently fails
-    if (!window.tgUserId) {
-      window.tgUserId = 777777777;
-      console.log("Using default fallback test tgUserId:", window.tgUserId);
-    }
-
-    if (window.tgUserId) {
+    window.tgUserId = resolveTelegramUserId();
+    if (window.tgUserId && window.tgUserId !== 777777777) {
       safeSetStorage('tg_user_id', window.tgUserId);
     }
+
+    // Auto-open roulette detection
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const qOpen = urlParams.get('open') || hashParams.get('open');
+      const qStart = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
+      const tgStart = (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) ? Telegram.WebApp.initDataUnsafe.start_param : null;
+
+      if (qOpen === 'roulette' || (qStart && qStart.startsWith('roulette')) || (tgStart && tgStart.startsWith('roulette'))) {
+        window.autoOpenRoulette = true;
+      }
+    } catch (e) {}
 
     async function loadCloudUserState() {
       if (!window.tgUserId) {
@@ -14529,7 +14534,7 @@
           console.log("🎰 Auto-opening roulette modal...");
           setTimeout(() => {
             openRouletteModal();
-          }, 350);
+          }, 200);
         }
       }
     }
@@ -14573,16 +14578,21 @@
       }
     }
 
+    // Initialize Telegram WebApp view
+    if (window.Telegram && Telegram.WebApp) {
+      try {
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+      } catch (e) {}
+    }
+
     // Load cloud state on init
     loadCloudUserState();
 
     if (window.autoOpenRoulette) {
       setTimeout(() => {
-        if (window.autoOpenRoulette) {
-          window.autoOpenRoulette = false;
-          openRouletteModal();
-        }
-      }, 700);
+        openRouletteModal();
+      }, 400);
     }
 
 
@@ -14609,6 +14619,40 @@
       if (overlay) {
         overlay.style.display = hasUnlocked ? 'none' : 'flex';
       }
+
+      // Dynamic text and button for empty lair based on egg balance
+      const emptyLairTitle = document.getElementById('emptyLairTitle');
+      const emptyLairDesc = document.getElementById('emptyLairDesc');
+      const emptyLairRouletteBtn = document.getElementById('emptyLairRouletteBtn');
+      const emptyLairRouletteBtnText = document.getElementById('emptyLairRouletteBtnText');
+      const emptyLairStatusBadge = document.getElementById('emptyLairStatusBadge');
+
+      if (!hasUnlocked) {
+        if (eggsInventory > 0) {
+          if (emptyLairTitle) emptyLairTitle.innerText = "✨ У вас є магічні яйця!";
+          if (emptyLairDesc) emptyLairDesc.innerHTML = `У вас є <span class="text-amber-400 font-bold">${eggsInventory} 🥚</span> драконячих яєць!<br>Покрутіть Рулетку, щоб розбудити та вибити свого першого 3D дракона!`;
+          if (emptyLairRouletteBtnText) emptyLairRouletteBtnText.innerText = `Крутити Рулетку (${eggsInventory} 🥚)`;
+          if (emptyLairStatusBadge) {
+            emptyLairStatusBadge.innerText = `${eggsInventory} 🥚 чекають!`;
+            emptyLairStatusBadge.className = "absolute -top-1 -right-2 text-[10px] bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 rounded-full font-bold animate-pulse";
+          }
+          if (emptyLairRouletteBtn) {
+            emptyLairRouletteBtn.className = "w-full max-w-xs py-3.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-500 hover:to-pink-500 text-white font-black text-xs shadow-xl shadow-purple-900/40 transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 animate-bounce";
+          }
+        } else {
+          if (emptyLairTitle) emptyLairTitle.innerText = "Ваше Лігво ще спить";
+          if (emptyLairDesc) emptyLairDesc.innerText = "Тут панує тиша... Зіграйте в ігри чат-бота (/bomb, /movie, /cities), щоб здобути яйця дракона!";
+          if (emptyLairRouletteBtnText) emptyLairRouletteBtnText.innerText = "Відкрити Рулетку (0 🥚)";
+          if (emptyLairStatusBadge) {
+            emptyLairStatusBadge.innerText = "🔒 Спить";
+            emptyLairStatusBadge.className = "absolute -top-1 -right-2 text-[10px] bg-slate-800 border border-slate-700 text-slate-400 px-2 py-0.5 rounded-full font-bold";
+          }
+          if (emptyLairRouletteBtn) {
+            emptyLairRouletteBtn.className = "w-full max-w-xs py-2.5 rounded-xl bg-slate-900 border border-purple-500/40 text-purple-300 font-bold text-xs hover:bg-purple-950/40 transition-all flex items-center justify-center gap-2";
+          }
+        }
+      }
+
       if (typeof eggGroup !== 'undefined' && eggGroup) {
         eggGroup.visible = hasUnlocked ? (currentLevel <= 9) : false;
       }
@@ -14753,9 +14797,10 @@
       safeSetStorage('tg_user_id', val);
       updateAdminIdBanner();
       
-      // CRITICAL: Immediately push current local balance, eggs, and dragons to server for this user ID!
+      // Pull user data from cloud and push local data
+      loadCloudUserState();
       syncWithServer();
-      showNotice(`✅ Telegram ID ${val} успішно прив'язано! На баланс збережено: ${eggsInventory} 🥚 яєць, ${sparksBalance} 🪙 монет та відкритих драконів.`);
+      showNotice(`✅ Telegram ID ${val} успішно прив'язано! Дані синхронізовано з ботом.`);
     }
 
     function closeAdminDashboard() {
@@ -14860,7 +14905,7 @@
 
   </script>
   <!-- 4-EGG ROULETTE MODAL (!рулетка) -->
-  <div id="rouletteModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" style="display: none;">
+  <div id="rouletteModal" class="fixed inset-0 z-[999999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" style="display: none; z-index: 999999;">
     <div class="bg-[#101527] border border-purple-500/60 rounded-3xl max-w-sm w-full p-5 shadow-2xl space-y-4 text-center">
       <div class="flex justify-between items-center pb-2 border-b border-slate-800">
         <div class="flex items-center gap-2">
