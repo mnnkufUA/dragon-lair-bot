@@ -10405,6 +10405,76 @@
     const fbxLoader = new THREE.FBXLoader();
     const texLoader = new THREE.TextureLoader();
 
+    
+    // ==========================================
+    // 4 ELEMENTS VISUAL PALETTES & MATERIAL STYLING
+    // ==========================================
+    const ELEMENT_PALETTES = {
+      fire: {
+        color: 0xf59e0b,
+        emissive: 0xd97706,
+        emissiveIntensity: 0.35,
+        dragonEmissive: 0xd97706,
+        dragonEmissiveIntensity: 0.15,
+        lightColor: 0xff7700
+      },
+      storm: {
+        color: 0xa855f7,
+        emissive: 0x7e22ce,
+        emissiveIntensity: 0.45,
+        dragonEmissive: 0x8b5cf6,
+        dragonEmissiveIntensity: 0.35,
+        lightColor: 0xaa33ff
+      },
+      frost: {
+        color: 0x06b6d4,
+        emissive: 0x0891b2,
+        emissiveIntensity: 0.45,
+        dragonEmissive: 0x06b6d4,
+        dragonEmissiveIntensity: 0.35,
+        lightColor: 0x38bdf8
+      },
+      jade: {
+        color: 0x10b981,
+        emissive: 0x059669,
+        emissiveIntensity: 0.40,
+        dragonEmissive: 0x10b981,
+        dragonEmissiveIntensity: 0.30,
+        lightColor: 0x10b981
+      }
+    };
+
+    function setEggElementColor(elemKey) {
+      const p = ELEMENT_PALETTES[elemKey] || ELEMENT_PALETTES.fire;
+      if (typeof fallbackEggMat !== 'undefined' && fallbackEggMat) {
+        fallbackEggMat.color.setHex(p.color);
+        fallbackEggMat.emissive.setHex(p.emissive);
+        fallbackEggMat.emissiveIntensity = p.emissiveIntensity;
+      }
+      if (typeof tripoEggMaterial !== 'undefined' && tripoEggMaterial) {
+        tripoEggMaterial.color.setHex(p.color);
+        tripoEggMaterial.emissive.setHex(p.emissive);
+        tripoEggMaterial.emissiveIntensity = p.emissiveIntensity;
+      }
+      if (typeof pointInternalLight !== 'undefined' && pointInternalLight) {
+        pointInternalLight.color.setHex(p.lightColor);
+        pointInternalLight.intensity = (currentLevel >= 3) ? (currentLevel - 2) * 0.45 : 0.6;
+      }
+    }
+
+    function applyDragonElementMaterial(model, elemKey) {
+      if (!model) return;
+      const p = ELEMENT_PALETTES[elemKey] || ELEMENT_PALETTES.fire;
+      model.traverse((child) => {
+        if (child.isMesh && child.material) {
+          if (child.material.emissive) {
+            child.material.emissive.setHex(p.dragonEmissive);
+            child.material.emissiveIntensity = p.dragonEmissiveIntensity;
+          }
+        }
+      });
+    }
+
     function loadDragonForElement(elemKey, onLoaded) {
       if (dragonsCache[elemKey]) {
         onLoaded(dragonsCache[elemKey]);
@@ -10480,48 +10550,67 @@
     }
 
     function switchActiveDragon(newKey) {
-      if (!MODELS_DATA[newKey]) {
-        showNotice(`⚠️ Модель для цієї стихії ще не завантажена! Чекаємо твій файл.`);
-        return;
+      if (!newKey || !MODELS_DATA[newKey]) {
+        newKey = 'fire';
       }
 
-      // Hide current dragon
-      if (dragonsCache[activeDragonKey] && dragonsCache[activeDragonKey].model) {
-        dragonsCache[activeDragonKey].model.visible = false;
-      }
+      // Hide all dragon models
+      Object.keys(dragonsCache).forEach(k => {
+        if (dragonsCache[k] && dragonsCache[k].model) {
+          dragonsCache[k].model.visible = false;
+        }
+      });
 
       activeDragonKey = newKey;
+      currentElement = newKey;
+      const cLvl = (dragonLevels && dragonLevels[newKey]) ? dragonLevels[newKey] : (currentLevel || 1);
+      currentLevel = cLvl;
 
-      loadDragonForElement(newKey, (entry) => {
-        entry.model.visible = (currentLevel >= 10);
-
-        // Ensure all conflicting actions on this dragon are cleanly stopped and disabled
-        const targetIdle = getIdleActionName();
-        Object.keys(entry.actions).forEach(k => {
-          if (k !== targetIdle) {
-            entry.actions[k].stop();
-            entry.actions[k].enabled = false;
-            entry.actions[k].setEffectiveWeight(0);
-          }
-        });
-
-        if (entry.actions[targetIdle]) {
-          entry.actions[targetIdle].reset();
-          entry.actions[targetIdle].setEffectiveWeight(1);
-          entry.actions[targetIdle].setLoop(THREE.LoopRepeat);
-          entry.actions[targetIdle].play();
-          entry.currentAction = targetIdle;
-          isActionLocked = false;
-          updateAnimBadge(targetIdle);
+      // STAGE CHECK: Levels 1-9 are 3D Egg, Levels 10+ are 3D animated dragon
+      if (cLvl <= 9) {
+        if (typeof eggGroup !== 'undefined' && eggGroup) {
+          eggGroup.visible = true;
+          setEggElementColor(newKey);
         }
+      } else {
+        if (typeof eggGroup !== 'undefined' && eggGroup) {
+          eggGroup.visible = false;
+        }
+        loadDragonForElement(newKey, (entry) => {
+          entry.model.visible = true;
+          applyDragonElementMaterial(entry.model, newKey);
 
-        updateNightModeVisuals();
-        updateStageVisual();
-        update360EnvVisibility();
-      });
+          // Ensure all conflicting actions on this dragon are cleanly stopped and disabled
+          const targetIdle = getIdleActionName();
+          Object.keys(entry.actions).forEach(k => {
+            if (k !== targetIdle) {
+              entry.actions[k].stop();
+              entry.actions[k].enabled = false;
+              entry.actions[k].setEffectiveWeight(0);
+            }
+          });
+
+          if (entry.actions[targetIdle]) {
+            entry.actions[targetIdle].reset();
+            entry.actions[targetIdle].setEffectiveWeight(1);
+            entry.actions[targetIdle].setLoop(THREE.LoopRepeat);
+            entry.actions[targetIdle].play();
+            entry.currentAction = targetIdle;
+            isActionLocked = false;
+            updateAnimBadge(targetIdle);
+          }
+
+          updateNightModeVisuals();
+          updateStageVisual();
+          update360EnvVisibility();
+        });
+      }
+
+      updateStageVisual();
+      updateElementButtonsUI();
+      applyDragonNameUI();
     }
 
-    // Animation Controller with Complete Playback Lock and Smooth Crossfading
     function playAction(name, loopOnce = false, onFinishedCallback = null, forceInterrupt = false, blendDuration = 0.35) {
       const entry = dragonsCache[activeDragonKey];
       if (!entry || !entry.actions[name] || !entry.mixer) return;
@@ -13937,8 +14026,17 @@
               };
             }
           } else {
-            unlockedElements.push(rouletteWinningElement);
+            if (!unlockedElements.includes(rouletteWinningElement)) {
+              unlockedElements.push(rouletteWinningElement);
+            }
             safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
+            activeDragonKey = rouletteWinningElement;
+            currentElement = rouletteWinningElement;
+            if (!dragonLevels) dragonLevels = {};
+            if (!dragonLevels[rouletteWinningElement]) dragonLevels[rouletteWinningElement] = 1;
+            currentLevel = dragonLevels[rouletteWinningElement];
+            safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+            safeSetStorage('active_dragon_key', activeDragonKey);
             updateElementButtonsUI();
             checkEmptyLairState();
             syncWithServer();
@@ -13972,8 +14070,8 @@
       activeDragonKey = rouletteWinningElement;
       currentElement = rouletteWinningElement;
       if (!dragonLevels) dragonLevels = {};
-      dragonLevels[rouletteWinningElement] = 1;
-      currentLevel = 1;
+      if (!dragonLevels[rouletteWinningElement]) dragonLevels[rouletteWinningElement] = 1;
+      currentLevel = dragonLevels[rouletteWinningElement] || 1;
       safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
       safeSetStorage('active_dragon_key', activeDragonKey);
 
@@ -13993,7 +14091,6 @@
       }
     }
 
-    // Naming & Rename System (Independent Names for Every Dragon!)
     function initNamingCheck() {
       applyDragonNameUI();
       checkEmptyLairState();
@@ -14376,13 +14473,15 @@
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const qId = urlParams.get('user_id') || urlParams.get('tg_user_id') || hashParams.get('user_id') || hashParams.get('tg_user_id');
         if (qId && parseInt(qId, 10) > 0) {
-          return parseInt(qId, 10);
+          const parsed = parseInt(qId, 10);
+          if (parsed !== 777777777) return parsed;
         }
         const start = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
         if (start) {
-          const m = start.match(/(?:user_|roulette_)?(\d+)/);
+          const m = start.match(/(?:user_|roulette_|lair_)?(\d+)/);
           if (m && parseInt(m[1], 10) > 0) {
-            return parseInt(m[1], 10);
+            const parsed = parseInt(m[1], 10);
+            if (parsed !== 777777777) return parsed;
           }
         }
       } catch (e) {}
@@ -14392,20 +14491,27 @@
         if (window.Telegram && Telegram.WebApp) {
           if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
             const uid = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
-            if (uid > 0) return uid;
+            if (uid > 0 && uid !== 777777777) return uid;
           }
           if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
-            const m = Telegram.WebApp.initDataUnsafe.start_param.match(/(?:user_|roulette_)?(\d+)/);
+            const m = Telegram.WebApp.initDataUnsafe.start_param.match(/(?:user_|roulette_|lair_)?(\d+)/);
             if (m && parseInt(m[1], 10) > 0) {
-              return parseInt(m[1], 10);
+              const parsed = parseInt(m[1], 10);
+              if (parsed !== 777777777) return parsed;
             }
           }
           if (Telegram.WebApp.initData) {
             const params = new URLSearchParams(Telegram.WebApp.initData);
             const uStr = params.get('user');
             if (uStr) {
-              const uObj = JSON.parse(decodeURIComponent(uStr));
-              if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) return parseInt(uObj.id, 10);
+              let uObj = null;
+              try { uObj = JSON.parse(uStr); } catch (e1) {
+                try { uObj = JSON.parse(decodeURIComponent(uStr)); } catch (e2) {}
+              }
+              if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) {
+                const parsed = parseInt(uObj.id, 10);
+                if (parsed !== 777777777) return parsed;
+              }
             }
           }
         }
@@ -14420,8 +14526,14 @@
           const innerParams = new URLSearchParams(rawTgData);
           const uStr = innerParams.get('user');
           if (uStr) {
-            const uObj = JSON.parse(decodeURIComponent(uStr));
-            if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) return parseInt(uObj.id, 10);
+            let uObj = null;
+            try { uObj = JSON.parse(uStr); } catch (e1) {
+              try { uObj = JSON.parse(decodeURIComponent(uStr)); } catch (e2) {}
+            }
+            if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) {
+              const parsed = parseInt(uObj.id, 10);
+              if (parsed !== 777777777) return parsed;
+            }
           }
         }
       } catch (e) {}
@@ -14435,13 +14547,7 @@
         }
       } catch (e) {}
 
-      // 5. If opened without Telegram session, return null (never fake dummy ID)
       return null;
-    }
-
-    window.tgUserId = resolveTelegramUserId();
-    if (window.tgUserId) {
-      safeSetStorage('tg_user_id', window.tgUserId);
     }
 
     // Auto-open roulette detection
@@ -14459,6 +14565,9 @@
 
     async function loadCloudUserState() {
       if (!window.tgUserId) {
+        window.tgUserId = resolveTelegramUserId();
+      }
+      if (!window.tgUserId) {
         console.warn("⚠️ loadCloudUserState: window.tgUserId is null, skipping.");
         return;
       }
@@ -14472,54 +14581,59 @@
         const data = await res.json();
         console.log(`📥 [loadCloudUserState] Loaded data for user ${window.tgUserId}:`, data);
         if (data && data.user_id) {
-          // Keep highest value so newly earned local coins/eggs aren't wiped by empty server defaults
-          if (data.coins !== undefined && (data.coins > 0 || sparksBalance === 0)) sparksBalance = data.coins;
-          if (data.food !== undefined && (data.food > 0 || foodCount === 0)) foodCount = data.food;
-          if (data.eggs !== undefined && (data.eggs > 0 || eggsInventory === 0)) eggsInventory = data.eggs;
-          if (data.tears !== undefined && (data.tears > 0 || dragonTearsBalance === 0)) dragonTearsBalance = data.tears;
-          if (data.active_element) currentElement = data.active_element;
+          if (data.coins !== undefined) sparksBalance = data.coins;
+          if (data.food !== undefined) foodCount = data.food;
+          if (data.eggs !== undefined) eggsInventory = data.eggs;
+          if (data.tears !== undefined) dragonTearsBalance = data.tears;
+
           if (data.unlocked_elements) {
             try {
               const remoteUnlocked = typeof data.unlocked_elements === 'string' ? JSON.parse(data.unlocked_elements) : data.unlocked_elements;
-              if (Array.isArray(remoteUnlocked) && remoteUnlocked.length > 0) {
-                const combined = Array.from(new Set([...(unlockedElements || []), ...remoteUnlocked]));
-                unlockedElements = combined;
+              if (Array.isArray(remoteUnlocked)) {
+                unlockedElements = remoteUnlocked;
               }
             } catch(e){}
           }
           if (data.dragon_names) {
             try {
               const dNames = typeof data.dragon_names === 'string' ? JSON.parse(data.dragon_names) : data.dragon_names;
-              Object.assign(dragonNames, dNames);
+              if (dNames && typeof dNames === 'object') Object.assign(dragonNames, dNames);
             } catch(e){}
           }
           if (data.named_dragons) {
             try {
               const nDragons = typeof data.named_dragons === 'string' ? JSON.parse(data.named_dragons) : data.named_dragons;
-              Object.assign(namedDragons, nDragons);
+              if (nDragons && typeof nDragons === 'object') Object.assign(namedDragons, nDragons);
             } catch(e){}
           }
           if (data.dragon_levels) {
             try {
               const dLevels = typeof data.dragon_levels === 'string' ? JSON.parse(data.dragon_levels) : data.dragon_levels;
-              Object.assign(dragonLevels, dLevels);
+              if (dLevels && typeof dLevels === 'object') Object.assign(dragonLevels, dLevels);
             } catch(e){}
           }
           if (data.dragon_xp) {
             try {
               const dXP = typeof data.dragon_xp === 'string' ? JSON.parse(data.dragon_xp) : data.dragon_xp;
-              Object.assign(dragonXP, dXP);
+              if (dXP && typeof dXP === 'object') Object.assign(dragonXP, dXP);
             } catch(e){}
           }
 
           if (unlockedElements && unlockedElements.length > 0) {
-            if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
-              activeDragonKey = currentElement || unlockedElements[0] || 'fire';
+            if (data.active_element && unlockedElements.includes(data.active_element)) {
+              activeDragonKey = data.active_element;
+            } else {
+              activeDragonKey = unlockedElements[0];
             }
             currentElement = activeDragonKey;
             const overlay = document.getElementById('emptyLairOverlay');
             if (overlay) overlay.style.display = 'none';
+          } else {
+            activeDragonKey = null;
+            currentElement = 'fire';
           }
+
+          currentLevel = (activeDragonKey && dragonLevels[activeDragonKey]) ? dragonLevels[activeDragonKey] : 1;
 
           safeSetStorage('sparks_balance', sparksBalance);
           safeSetStorage('food_count', foodCount);
@@ -14527,7 +14641,7 @@
           safeSetStorage('dragon_tears_balance', dragonTearsBalance);
           safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
           safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
-          safeSetStorage('active_dragon_key', activeDragonKey);
+          safeSetStorage('active_dragon_key', activeDragonKey || '');
 
           syncActiveDragonStats();
           checkEmptyLairState();
@@ -14599,19 +14713,34 @@
       } catch (e) {}
     }
 
-    // Load cloud state on init
-    loadCloudUserState();
-
-    if (window.autoOpenRoulette) {
-      setTimeout(() => {
-        openRouletteModal();
-      }, 400);
+    // Async User Resolution & Poller for Telegram Desktop & Mobile Handshake
+    window.tgUserId = resolveTelegramUserId();
+    if (window.tgUserId) {
+      safeSetStorage('tg_user_id', window.tgUserId);
+      loadCloudUserState();
+    } else {
+      let attempts = 0;
+      const pollTimer = setInterval(() => {
+        attempts++;
+        const resolved = resolveTelegramUserId();
+        if (resolved) {
+          clearInterval(pollTimer);
+          window.tgUserId = resolved;
+          safeSetStorage('tg_user_id', resolved);
+          console.log(`✅ [Telegram WebApp] User ID resolved after ${attempts * 50}ms: ${resolved}`);
+          loadCloudUserState();
+        } else if (attempts >= 40) { // 2 seconds
+          clearInterval(pollTimer);
+          console.warn("⚠️ [Telegram WebApp] No Telegram user session detected after 2000ms.");
+          const savedFallback = safeGetStorage('tg_user_id');
+          if (savedFallback && parseInt(savedFallback, 10) > 0) {
+            window.tgUserId = parseInt(savedFallback, 10);
+            loadCloudUserState();
+          }
+        }
+      }, 50);
     }
 
-
-    // ==============================================
-    // EMPTY LAIR & ADMIN / DEV LOGIC
-    // ==============================================
     function handleEmptyLairClose() {
       if (window.Telegram && Telegram.WebApp && Telegram.WebApp.close) {
         Telegram.WebApp.close();
@@ -14815,7 +14944,7 @@
       }
     }
 
-    function adminBindTgUserId() {
+    async function adminBindTgUserId() {
       const input = document.getElementById('adminTgUserIdInput');
       if (!input) return;
       const val = parseInt(input.value.trim(), 10);
@@ -14827,10 +14956,9 @@
       safeSetStorage('tg_user_id', val);
       updateAdminIdBanner();
       
-      // Pull user data from cloud and push local data
-      loadCloudUserState();
-      syncWithServer();
-      showNotice(`✅ Telegram ID ${val} успішно прив'язано! Дані синхронізовано з ботом.`);
+      // Pull user data from cloud (AWAIT first so server data is not overwritten!)
+      await loadCloudUserState();
+      showNotice(`✅ Telegram ID ${val} успішно прив'язано! Дані завантажено з хмари.`);
     }
 
     function closeAdminDashboard() {
@@ -14852,7 +14980,7 @@
       ['fire', 'storm', 'frost', 'jade'].forEach(k => {
         dragonLevels[k] = hatched ? 15 : 1;
       });
-      currentLevel = dragonLevels['fire'] || (hatched ? 15 : 1);
+      currentLevel = hatched ? 15 : 1;
 
       safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
       safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
@@ -14863,9 +14991,9 @@
       if (overlay) overlay.style.display = 'none';
 
       // 2. Immediately update the element buttons UI so "🔒 Закрито" is replaced with "Lv 15 ✨"
-      updateElementButtonsUI();
       updateCurrencyUI();
-      setElement('fire');
+      updateElementButtonsUI();
+      switchActiveDragon('fire');
       syncActiveDragonStats();
       applyDragonNameUI();
       updateStageVisual();
@@ -14892,32 +15020,48 @@
       showNotice(`🆙 Дракону (${activeDragonKey}) додано +${levelsToAdd} рівнів! (Зараз: Lv ${nextLvl})`);
     }
 
-    function adminResetProfileToZero() {
+    async function adminResetProfileToZero() {
       if (!confirm("Скинути весь прогрес до 0? (Будуть скинуті всі монети, яйця та дракони)")) return;
+      const uid = window.tgUserId;
       sparksBalance = 0;
       dragonTearsBalance = 0;
       foodCount = 0;
       eggsInventory = 0;
       unlockedElements = [];
       activeDragonKey = null;
+      currentElement = 'fire';
+      dragonLevels = { fire: 1, storm: 1, frost: 1, jade: 1 };
+      dragonXP = { fire: 0, storm: 0, frost: 0, jade: 0 };
 
-      try {
-        localStorage.clear();
-      } catch(e){}
+      safeSetStorage('sparks_balance', 0);
+      safeSetStorage('dragon_tears_balance', 0);
+      safeSetStorage('food_count', 0);
+      safeSetStorage('eggs_inventory', 0);
+      safeSetStorage('unlocked_elements', JSON.stringify([]));
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('active_dragon_key', '');
+      if (uid) {
+        safeSetStorage('tg_user_id', uid);
+      }
 
-      if (window.tgUserId) {
-        fetch('/api/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: window.tgUserId })
-        }).catch(e => console.log('Reset error:', e));
+      if (uid) {
+        try {
+          await fetch('/api/reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: uid })
+          });
+        } catch(e) {
+          console.log('Reset error:', e);
+        }
       }
 
       updateCurrencyUI();
+      updateElementButtonsUI();
       checkEmptyLairState();
       updateStageVisual();
       closeAdminDashboard();
-      showNotice("🔄 Профіль успішно скинуто до початкового стану (0)!");
+      showNotice("🔄 Весь прогрес скинуто до 0. Лігво готове для чистого старту.");
     }
 
     function adminAddEggs(count) {
