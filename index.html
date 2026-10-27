@@ -13816,6 +13816,8 @@
       if (isRouletteSpinning) return;
       const modal = document.getElementById('rouletteModal');
       if (modal) modal.style.display = 'none';
+      checkEmptyLairState();
+      updateCurrencyUI();
     }
 
     function spinEggRoulette() {
@@ -13966,12 +13968,23 @@
       if (!unlockedElements.includes(rouletteWinningElement)) {
         unlockedElements.push(rouletteWinningElement);
         safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
-        updateElementButtonsUI();
       }
+      activeDragonKey = rouletteWinningElement;
+      currentElement = rouletteWinningElement;
+      if (!dragonLevels) dragonLevels = {};
+      dragonLevels[rouletteWinningElement] = 1;
+      currentLevel = 1;
+      safeSetStorage('dragon_levels', JSON.stringify(dragonLevels));
+      safeSetStorage('active_dragon_key', activeDragonKey);
+
+      // Instantly hide empty lair overlay
+      const overlay = document.getElementById('emptyLairOverlay');
+      if (overlay) overlay.style.display = 'none';
+
       setElement(rouletteWinningElement);
-      onLevelChange(1);
-      updateStageVisual();
+      updateElementButtonsUI();
       applyDragonNameUI();
+      updateStageVisual();
       checkEmptyLairState();
       syncWithServer();
       showNotice(`🎉 Нове яйце стихії встановлено у ваше лігво!`);
@@ -14357,33 +14370,33 @@
     window.autoOpenRoulette = false;
 
     function resolveTelegramUserId() {
-      // 1. URL search or hash parameters
+      // 1. URL search or hash parameters (Bot explicitly passes ?user_id=...)
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const qId = urlParams.get('user_id') || urlParams.get('tg_user_id') || hashParams.get('user_id') || hashParams.get('tg_user_id');
-        if (qId && parseInt(qId, 10) > 0 && parseInt(qId, 10) !== 777777777) {
+        if (qId && parseInt(qId, 10) > 0) {
           return parseInt(qId, 10);
         }
         const start = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
         if (start) {
           const m = start.match(/(?:user_|roulette_)?(\d+)/);
-          if (m && parseInt(m[1], 10) > 0 && parseInt(m[1], 10) !== 777777777) {
+          if (m && parseInt(m[1], 10) > 0) {
             return parseInt(m[1], 10);
           }
         }
       } catch (e) {}
 
-      // 2. Telegram.WebApp.initDataUnsafe
+      // 2. Telegram.WebApp.initDataUnsafe (Provided directly by Telegram client)
       try {
         if (window.Telegram && Telegram.WebApp) {
           if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
             const uid = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
-            if (uid > 0 && uid !== 777777777) return uid;
+            if (uid > 0) return uid;
           }
           if (Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
             const m = Telegram.WebApp.initDataUnsafe.start_param.match(/(?:user_|roulette_)?(\d+)/);
-            if (m && parseInt(m[1], 10) > 0 && parseInt(m[1], 10) !== 777777777) {
+            if (m && parseInt(m[1], 10) > 0) {
               return parseInt(m[1], 10);
             }
           }
@@ -14392,7 +14405,7 @@
             const uStr = params.get('user');
             if (uStr) {
               const uObj = JSON.parse(decodeURIComponent(uStr));
-              if (uObj && uObj.id && parseInt(uObj.id, 10) !== 777777777) return parseInt(uObj.id, 10);
+              if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) return parseInt(uObj.id, 10);
             }
           }
         }
@@ -14408,12 +14421,12 @@
           const uStr = innerParams.get('user');
           if (uStr) {
             const uObj = JSON.parse(decodeURIComponent(uStr));
-            if (uObj && uObj.id && parseInt(uObj.id, 10) !== 777777777) return parseInt(uObj.id, 10);
+            if (uObj && uObj.id && parseInt(uObj.id, 10) > 0) return parseInt(uObj.id, 10);
           }
         }
       } catch (e) {}
 
-      // 4. Check localStorage (ignore test 777777777)
+      // 4. Saved ID in localStorage from previous session
       try {
         const saved = safeGetStorage('tg_user_id');
         if (saved) {
@@ -14422,12 +14435,12 @@
         }
       } catch (e) {}
 
-      // 5. Default fallback to the real Telegram ID of the bot owner
-      return 5310415233;
+      // 5. If opened without Telegram session, return null (never fake dummy ID)
+      return null;
     }
 
     window.tgUserId = resolveTelegramUserId();
-    if (window.tgUserId && window.tgUserId !== 777777777) {
+    if (window.tgUserId) {
       safeSetStorage('tg_user_id', window.tgUserId);
     }
 
@@ -14608,26 +14621,74 @@
     }
 
     function checkEmptyLairState() {
-      if (unlockedElements && unlockedElements.length > 0) {
-        if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
-          activeDragonKey = unlockedElements[0] || 'fire';
-        }
-        currentElement = activeDragonKey;
-      }
-      const hasUnlocked = (unlockedElements && unlockedElements.length > 0 && !!activeDragonKey);
+      // 1. Unambiguous check: Player owns at least 1 dragon element
+      const hasUnlocked = Array.isArray(unlockedElements) && unlockedElements.length > 0;
+
+      // 2. Hide or show the empty lair overlay
       const overlay = document.getElementById('emptyLairOverlay');
       if (overlay) {
         overlay.style.display = hasUnlocked ? 'none' : 'flex';
       }
 
-      // Dynamic text and button for empty lair based on egg balance
+      const stageTitle = document.getElementById('stageTitle');
+      const petName = document.getElementById('petName');
+      const stageIcon = document.getElementById('stageIcon');
       const emptyLairTitle = document.getElementById('emptyLairTitle');
       const emptyLairDesc = document.getElementById('emptyLairDesc');
       const emptyLairRouletteBtn = document.getElementById('emptyLairRouletteBtn');
       const emptyLairRouletteBtnText = document.getElementById('emptyLairRouletteBtnText');
       const emptyLairStatusBadge = document.getElementById('emptyLairStatusBadge');
+      
+      const feedBtn = document.getElementById('feedBtn');
+      const trainBtn = document.getElementById('trainBtn');
+      const expeditionBtn = document.getElementById('expeditionBtn');
 
-      if (!hasUnlocked) {
+      if (hasUnlocked) {
+        // PLAYER HAS UNLOCKED DRAGONS -> Lair is active!
+        if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
+          activeDragonKey = unlockedElements[0] || 'fire';
+        }
+        currentElement = activeDragonKey;
+
+        // Enable buttons
+        if (feedBtn) { feedBtn.style.opacity = '1.0'; feedBtn.style.cursor = 'pointer'; }
+        if (trainBtn) { trainBtn.style.opacity = '1.0'; trainBtn.style.cursor = 'pointer'; }
+        if (expeditionBtn) { expeditionBtn.style.opacity = '1.0'; expeditionBtn.style.cursor = 'pointer'; }
+
+        // Set Dragon Name
+        const dName = (typeof getCurrentDragonName === 'function') ? getCurrentDragonName(activeDragonKey) : (dragonNames[activeDragonKey] || 'Дракон');
+        if (petName) petName.innerText = dName;
+
+        // Set Stage Title & Icon based on active dragon's level
+        const cLvl = (dragonLevels && dragonLevels[activeDragonKey]) ? dragonLevels[activeDragonKey] : (currentLevel || 1);
+        currentLevel = cLvl;
+        if (stageTitle) {
+          stageTitle.innerText = (typeof getStageName === 'function') ? getStageName(cLvl) : (cLvl >= 10 ? 'Дорослий Дракон' : 'Яйце Дракона');
+        }
+        if (stageIcon) {
+          stageIcon.innerText = (cLvl >= 10) ? '🐉' : '🥚';
+        }
+
+        // 3D Egg vs Dragon Model visibility
+        if (typeof eggGroup !== 'undefined' && eggGroup) {
+          eggGroup.visible = (cLvl <= 9);
+        }
+        if (dragonsCache[activeDragonKey] && dragonsCache[activeDragonKey].model) {
+          dragonsCache[activeDragonKey].model.visible = (cLvl >= 10);
+        }
+      } else {
+        // PLAYER OWNS 0 DRAGONS -> Lair is sleeping
+        if (stageTitle) stageTitle.innerText = "Лігво ще спить";
+        if (petName) petName.innerText = "Порожньо";
+        if (stageIcon) stageIcon.innerText = "🔒";
+        lastTrainTimestamp = 0;
+        lastExpeditionTimestamp = 0;
+        if (feedBtn) { feedBtn.style.opacity = '0.4'; feedBtn.style.cursor = 'not-allowed'; }
+        if (trainBtn) { trainBtn.style.opacity = '0.4'; trainBtn.style.cursor = 'not-allowed'; }
+        if (expeditionBtn) { expeditionBtn.style.opacity = '0.4'; expeditionBtn.style.cursor = 'not-allowed'; }
+        if (typeof eggGroup !== 'undefined' && eggGroup) eggGroup.visible = false;
+
+        // Dynamic text and button for empty lair based on egg balance
         if (eggsInventory > 0) {
           if (emptyLairTitle) emptyLairTitle.innerText = "✨ У вас є магічні яйця!";
           if (emptyLairDesc) emptyLairDesc.innerHTML = `У вас є <span class="text-amber-400 font-bold">${eggsInventory} 🥚</span> драконячих яєць!<br>Покрутіть Рулетку, щоб розбудити та вибити свого першого 3D дракона!`;
@@ -14653,37 +14714,6 @@
         }
       }
 
-      if (typeof eggGroup !== 'undefined' && eggGroup) {
-        eggGroup.visible = hasUnlocked ? (currentLevel <= 9) : false;
-      }
-      const stageTitle = document.getElementById('stageTitle');
-      const petName = document.getElementById('petName');
-      const stageIcon = document.getElementById('stageIcon');
-      
-      const feedBtn = document.getElementById('feedBtn');
-      const trainBtn = document.getElementById('trainBtn');
-      const expeditionBtn = document.getElementById('expeditionBtn');
-
-      if (!hasUnlocked) {
-        if (stageTitle) stageTitle.innerText = "Лігво ще спить";
-        if (petName) petName.innerText = "Порожньо";
-        if (stageIcon) stageIcon.innerText = "🔒";
-        lastTrainTimestamp = 0;
-        lastExpeditionTimestamp = 0;
-        if (feedBtn) { feedBtn.style.opacity = '0.4'; feedBtn.style.cursor = 'not-allowed'; }
-        if (trainBtn) { trainBtn.style.opacity = '0.4'; trainBtn.style.cursor = 'not-allowed'; }
-        if (expeditionBtn) { expeditionBtn.style.opacity = '0.4'; expeditionBtn.style.cursor = 'not-allowed'; }
-      } else {
-        if (feedBtn) { feedBtn.style.opacity = '1.0'; feedBtn.style.cursor = 'pointer'; }
-        if (trainBtn) { trainBtn.style.opacity = '1.0'; trainBtn.style.cursor = 'pointer'; }
-        if (expeditionBtn) { expeditionBtn.style.opacity = '1.0'; expeditionBtn.style.cursor = 'pointer'; }
-        if (petName) {
-          petName.innerText = (typeof getCurrentDragonName === 'function') ? getCurrentDragonName() : (dragonNames[activeDragonKey] || 'Дракон');
-        }
-        if (stageTitle && (stageTitle.innerText === 'Лігво ще спить' || stageTitle.innerText === 'Порожньо')) {
-          stageTitle.innerText = (typeof getStageName === 'function') ? getStageName(currentLevel) : 'Дорослий Дракон';
-        }
-      }
       updateCooldownTimers();
       update360EnvVisibility();
       updateElementButtonsUI();
@@ -14757,7 +14787,7 @@
         modal.style.zIndex = '99999';
         const input = document.getElementById('adminTgUserIdInput');
         if (input) {
-          input.value = (window.tgUserId && window.tgUserId !== 777777777) ? window.tgUserId : '';
+          input.value = window.tgUserId || '';
         }
         updateAdminIdBanner();
       }
@@ -14766,21 +14796,21 @@
     function updateAdminIdBanner() {
       const statusEl = document.getElementById('adminTgUserStatus');
       const hintEl = document.getElementById('adminTgUserHint');
-      const isTest = (!window.tgUserId || window.tgUserId === 777777777);
+      const hasId = !!window.tgUserId;
       if (statusEl) {
-        if (isTest) {
+        if (!hasId) {
           statusEl.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40";
-          statusEl.innerText = "ТЕСТОВИЙ (777777777)";
+          statusEl.innerText = "НЕ ПРИВ'ЯЗАНО";
         } else {
           statusEl.className = "text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40";
           statusEl.innerText = `ПРИВ'ЯЗАНО: ${window.tgUserId}`;
         }
       }
       if (hintEl) {
-        if (isTest) {
-          hintEl.innerHTML = `⚠️ <strong class="text-amber-300">Зараз активний тестовий ID (777777777)!</strong> Бот у Telegram не бачить цей баланс.<br>Введіть ваш числовий Telegram ID (команда <code>/myid</code> у боті) та натисніть «💾 Зберегти ID», щоб накручені ресурси та яйця миттєво з'явилися у боті!`;
+        if (!hasId) {
+          hintEl.innerHTML = `⚠️ <strong class="text-amber-300">Telegram ID не визначено!</strong> Введіть ваш числовий ID (команда <code>/myid</code> у боті) та натисніть «💾 Зберегти ID», щоб прив'язати ресурси.`;
         } else {
-          hintEl.innerHTML = `✅ <strong class="text-emerald-300">Синхронізація з ботом активна!</strong> Всі накручені ресурси автоматично зберігаються на ваш обліковий запис Telegram (${window.tgUserId}).`;
+          hintEl.innerHTML = `✅ <strong class="text-emerald-300">Синхронізація активна!</strong> Всі накручені ресурси автоматично зберігаються на ваш обліковий запис Telegram (${window.tgUserId}).`;
         }
       }
     }
