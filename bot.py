@@ -3,7 +3,7 @@ import random
 import json
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand, MenuButtonWebApp
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
 from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL
@@ -157,6 +157,13 @@ async def cmd_start(message: types.Message):
         is_group = message.chat.type in ["group", "supergroup"]
         if not is_group:
             await update_user(uid, has_started=1)
+            try:
+                await message.bot.set_chat_menu_button(
+                    chat_id=uid,
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                )
+            except Exception:
+                pass
             # Check deep link start args
             text_parts = message.text.split() if message.text else []
             if len(text_parts) > 1:
@@ -193,6 +200,13 @@ async def cmd_lair(message: types.Message):
                 open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=lair_url)
         else:
             open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+            try:
+                await message.bot.set_chat_menu_button(
+                    chat_id=uid,
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                )
+            except Exception:
+                pass
 
         await message.answer(
             "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити 3D світ драконів:",
@@ -296,6 +310,14 @@ async def cmd_profile(message: types.Message, user_override: types.User = None):
             f"🔓 Відкрито стихій: **{len(unlocked)} / 4**\n"
             f"{dragons_detail}"
         )
+        if not is_group:
+            try:
+                await message.bot.set_chat_menu_button(
+                    chat_id=uid,
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                )
+            except Exception:
+                pass
         has_started = bool(user.get("has_started", 0)) if is_group else True
         await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid, has_started=has_started))
     except Exception as e:
