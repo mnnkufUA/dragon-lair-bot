@@ -96,11 +96,11 @@ async def cmd_admin_godmode(message: types.Message):
                 uid,
                 coins=10000,
                 food=50,
-                eggs=99,
+                eggs=60,
                 tears=100,
                 active_element="fire",
                 unlocked_elements=["fire", "storm", "frost", "jade"],
-                dragon_levels={"fire": 1, "storm": 1, "frost": 1, "jade": 1}
+                dragon_levels={"fire": 15, "storm": 15, "frost": 15, "jade": 15}
             )
             await message.answer(
                 "👑 <b>Режим розробника активовано!</b>\n\n"
