@@ -44,10 +44,26 @@ app.add_middleware(
 
 HTML_FILE_PATH = os.path.join(os.path.dirname(__file__), "index.html")
 
+ANTI_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+@app.middleware("http")
+async def add_anti_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path in ["/", "/index.html"]:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 @app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
 async def serve_webapp():
     if os.path.exists(HTML_FILE_PATH):
-        return FileResponse(HTML_FILE_PATH)
+        return FileResponse(HTML_FILE_PATH, headers=ANTI_CACHE_HEADERS)
     return HTMLResponse("<h1>Dragon Lair WebApp: index.html not found!</h1>", status_code=404)
 
 @app.get("/health")

@@ -39,7 +39,7 @@ if BLACKLIST_PATH.exists():
 # Global registry of active cities games: chat_id -> CitiesGame
 active_cities_games: Dict[int, "CitiesGame"] = {}
 
-INVALID_ENDINGS = set("ьъи'’` -")
+INVALID_ENDINGS = set("ьъий'’` -")
 
 
 def get_valid_last_letter(city_name: str) -> str:
@@ -139,14 +139,19 @@ class CitiesGame:
         return [p for p in self.players if p.team == "blue"]
 
     def get_lobby_markup(self) -> InlineKeyboardMarkup:
-        s10 = "⚡ 10с " + ("✅" if self.base_turn_seconds == 10 else "")
-        s15 = "⏱️ 15с " + ("✅" if self.base_turn_seconds == 15 else "")
-        s25 = "🐢 25с " + ("✅" if self.base_turn_seconds == 25 else "")
+        s20 = "⚡ 20с " + ("✅" if self.base_turn_seconds == 20 else "")
+        s45 = "⏱️ 45с " + ("✅" if self.base_turn_seconds == 45 else "")
+        s60 = "⏳ 60с " + ("✅" if self.base_turn_seconds == 60 else "")
 
         buttons = [
             [
                 InlineKeyboardButton(text="➕ Приєднатися", callback_data="cities_join"),
                 InlineKeyboardButton(text="➖ Покинути", callback_data="cities_leave")
+            ],
+            [
+                InlineKeyboardButton(text=s20, callback_data="cities_speed_20"),
+                InlineKeyboardButton(text=s45, callback_data="cities_speed_45"),
+                InlineKeyboardButton(text=s60, callback_data="cities_speed_60"),
             ]
         ]
 
@@ -538,7 +543,7 @@ class CitiesGame:
             if matched_key in self.used_cities:
                 await bot.send_message(
                     self.chat_id,
-                    f"⚠️ Місто «{html.escape(ALL_CITIES[matched_key])}» вже називали у цій подорожі! Придумай інше місто на <b>[{self.current_letter.upper()}]</b>.",
+                    f"⚠️ Місто <b>{html.escape(ALL_CITIES[matched_key])}</b> вже було названо в цій грі! Назвіть інше місто на букву <b>[{self.current_letter.upper()}]</b>.",
                     parse_mode="HTML"
                 )
                 return True

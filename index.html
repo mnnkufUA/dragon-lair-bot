@@ -13820,7 +13820,11 @@
 
       // Deduct 1 egg
       eggsInventory -= 1;
+      safeSetStorage('eggs_inventory', eggsInventory);
+      const balanceText = document.getElementById('rouletteBalanceText');
+      if (balanceText) balanceText.innerText = `${eggsInventory} 🥚`;
       updateCurrencyUI();
+      syncWithServer();
 
       isRouletteSpinning = true;
       const spinBtn = document.getElementById('spinRouletteBtn');
@@ -13907,7 +13911,9 @@
 
           if (isDuplicate) {
             foodCount += 5;
+            safeSetStorage('food_count', foodCount);
             updateCurrencyUI();
+            syncWithServer();
             if (resText) {
               resText.innerHTML = `🎉 Вам випало повторне ${names[rouletteWinningElement]}!<br><span class="text-emerald-400 font-bold">Оскільки воно вже у вас є — отримано компенсацію: +5 🍖 Смаколиків!</span>`;
             }
@@ -13922,6 +13928,8 @@
             unlockedElements.push(rouletteWinningElement);
             safeSetStorage('unlocked_elements', JSON.stringify(unlockedElements));
             updateElementButtonsUI();
+            checkEmptyLairState();
+            syncWithServer();
             if (resText) {
               resText.innerHTML = `🎉 ВІТАЄМО! Нове яйце: <span class="text-amber-300 font-bold">${names[rouletteWinningElement]}</span>!`;
             }
@@ -13954,6 +13962,8 @@
       onLevelChange(1);
       updateStageVisual();
       applyDragonNameUI();
+      checkEmptyLairState();
+      syncWithServer();
       showNotice(`🎉 Нове яйце стихії встановлено у ваше лігво!`);
       if (!hasCurrentDragonBeenNamed(rouletteWinningElement)) {
         setTimeout(() => openInitialNamingModal(rouletteWinningElement), 400);
@@ -14335,10 +14345,49 @@
     // CLOUD SYNC FOR TELEGRAM BOT (24/7 BACKEND)
     // ==========================================
     window.tgUserId = null;
+    window.autoOpenRoulette = false;
+
+    // 1. Detect start_param from Telegram WebApp (startapp=user_XXX or startapp=roulette_XXX)
+    let startParam = null;
     try {
-      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
+      if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.start_param) {
+        startParam = Telegram.WebApp.initDataUnsafe.start_param;
+      }
+    } catch (e) {}
+
+    // Check URL parameters for startapp / tgWebAppStartParam / open
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+      const qStartParam = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || urlParams.get('startapp') || hashParams.get('startapp');
+      if (!startParam && qStartParam) {
+        startParam = qStartParam;
+      }
+
+      if (urlParams.get('open') === 'roulette' || hashParams.get('open') === 'roulette') {
+        window.autoOpenRoulette = true;
+      }
+    } catch (e) {}
+
+    if (startParam) {
+      console.log("Detected Telegram WebApp start_param:", startParam);
+      if (startParam.startsWith('user_')) {
+        const parsed = parseInt(startParam.replace('user_', ''), 10);
+        if (parsed) window.tgUserId = parsed;
+      } else if (startParam.startsWith('roulette_')) {
+        const parsed = parseInt(startParam.replace('roulette_', ''), 10);
+        if (parsed) window.tgUserId = parsed;
+        window.autoOpenRoulette = true;
+      } else if (startParam === 'roulette') {
+        window.autoOpenRoulette = true;
+      }
+    }
+
+    // 2. Telegram WebApp direct user object
+    try {
+      if (!window.tgUserId && window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user && Telegram.WebApp.initDataUnsafe.user.id) {
         window.tgUserId = parseInt(Telegram.WebApp.initDataUnsafe.user.id, 10);
-        safeSetStorage('tg_user_id', window.tgUserId);
         console.log("Connected Telegram User ID from initDataUnsafe:", window.tgUserId);
       }
     } catch (e) {}
@@ -14352,7 +14401,6 @@
           const uObj = JSON.parse(decodeURIComponent(uStr));
           if (uObj && uObj.id) {
             window.tgUserId = parseInt(uObj.id, 10);
-            safeSetStorage('tg_user_id', window.tgUserId);
             console.log("Connected Telegram User ID from initData string:", window.tgUserId);
           }
         }
@@ -14363,10 +14411,10 @@
     if (!window.tgUserId) {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const qId = urlParams.get('user_id') || urlParams.get('tg_user_id');
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const qId = urlParams.get('user_id') || urlParams.get('tg_user_id') || hashParams.get('user_id') || hashParams.get('tg_user_id');
         if (qId) {
           window.tgUserId = parseInt(qId, 10) || qId;
-          safeSetStorage('tg_user_id', window.tgUserId);
           console.log("Restored Telegram User ID from URL parameter:", window.tgUserId);
         }
       } catch (e) {}
@@ -14387,6 +14435,10 @@
       console.log("Using default fallback test tgUserId:", window.tgUserId);
     }
 
+    if (window.tgUserId) {
+      safeSetStorage('tg_user_id', window.tgUserId);
+    }
+
     async function loadCloudUserState() {
       if (!window.tgUserId) {
         console.warn("⚠️ loadCloudUserState: window.tgUserId is null, skipping.");
@@ -14402,7 +14454,7 @@
         const data = await res.json();
         console.log(`📥 [loadCloudUserState] Loaded data for user ${window.tgUserId}:`, data);
         if (data && data.user_id) {
-          // Keep highest value so newly cheated local coins/eggs aren't wiped by empty server defaults
+          // Keep highest value so newly earned local coins/eggs aren't wiped by empty server defaults
           if (data.coins !== undefined && (data.coins > 0 || sparksBalance === 0)) sparksBalance = data.coins;
           if (data.food !== undefined && (data.food > 0 || foodCount === 0)) foodCount = data.food;
           if (data.eggs !== undefined && (data.eggs > 0 || eggsInventory === 0)) eggsInventory = data.eggs;
@@ -14412,7 +14464,8 @@
             try {
               const remoteUnlocked = typeof data.unlocked_elements === 'string' ? JSON.parse(data.unlocked_elements) : data.unlocked_elements;
               if (Array.isArray(remoteUnlocked) && remoteUnlocked.length > 0) {
-                unlockedElements = remoteUnlocked;
+                const combined = Array.from(new Set([...(unlockedElements || []), ...remoteUnlocked]));
+                unlockedElements = combined;
               }
             } catch(e){}
           }
@@ -14445,6 +14498,9 @@
             if (!activeDragonKey || !unlockedElements.includes(activeDragonKey)) {
               activeDragonKey = currentElement || unlockedElements[0] || 'fire';
             }
+            currentElement = activeDragonKey;
+            const overlay = document.getElementById('emptyLairOverlay');
+            if (overlay) overlay.style.display = 'none';
           }
 
           safeSetStorage('sparks_balance', sparksBalance);
@@ -14461,9 +14517,20 @@
           updateElementButtonsUI();
           applyDragonNameUI();
           updateStageVisual();
+          if (activeDragonKey) {
+            switchActiveDragon(activeDragonKey);
+          }
         }
       } catch (err) {
         console.error("❌ [loadCloudUserState] Cloud user state load error:", err);
+      } finally {
+        if (window.autoOpenRoulette) {
+          window.autoOpenRoulette = false;
+          console.log("🎰 Auto-opening roulette modal...");
+          setTimeout(() => {
+            openRouletteModal();
+          }, 350);
+        }
       }
     }
 
@@ -14508,6 +14575,15 @@
 
     // Load cloud state on init
     loadCloudUserState();
+
+    if (window.autoOpenRoulette) {
+      setTimeout(() => {
+        if (window.autoOpenRoulette) {
+          window.autoOpenRoulette = false;
+          openRouletteModal();
+        }
+      }, 700);
+    }
 
 
     // ==============================================
