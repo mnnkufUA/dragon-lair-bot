@@ -1,0 +1,18 @@
+ИНСТРУКЦИЯ ПО ОБНОВЛЕНИЮ НА GITHUB:
+
+1. Откройте ваш репозиторий в браузере: https://github.com/mnnkufUA/dragon-lair-bot
+2. Нажмите кнопку "Add file" -> "Upload files".
+3. Просто выделите ВСЕ файлы и папки из этой папки (ДЛЯ_ГИТХАБА_ОБНОВЛЕНИЕ) и перетяните в окно браузера на GitHub:
+   - index.html
+   - bot.py
+   - main.py
+   - database.py
+   - config.py
+   - cyber_bomb.py
+   - cities_game.py
+   - words_ua.json
+   - cities.json
+   - папки: games, handlers, data, assets
+4. Внизу нажмите зеленую кнопку "Commit changes".
+5. Подождите 1-2 минуты, пока Render обновится (деплой произойдет автоматически).
+6. Готово! Все баги исправлены, рулетка, лігво и игры работают стабильно.

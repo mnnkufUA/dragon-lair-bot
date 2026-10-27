@@ -4,7 +4,10 @@ from aiogram import Router, types, F
 from aiogram.filters import Command, Filter
 
 import database
-from games.cities_game import CitiesGame, Player, active_cities_games
+try:
+    from games.cities_game import CitiesGame, Player, active_cities_games
+except ImportError:
+    from cities_game import CitiesGame, Player, active_cities_games
 from handlers.bomb_handlers import chat_has_game, can_stop_game, _creating_chats
 from config import CITIES_TURN_SECONDS
 

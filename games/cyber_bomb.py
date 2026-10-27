@@ -21,9 +21,13 @@ from config import (
 
 logger = logging.getLogger("DragonCore")
 
-# Load Ukrainian words and syllables
+# Load Ukrainian words and syllables (with multi-path fallback)
 WORDS_PATH = BASE_DIR / "data" / "words_ua.json"
+if not WORDS_PATH.exists():
+    WORDS_PATH = BASE_DIR / "words_ua.json"
 SYLLABLES_PATH = BASE_DIR / "data" / "syllables_ua.json"
+if not SYLLABLES_PATH.exists():
+    SYLLABLES_PATH = BASE_DIR / "syllables_ua.json"
 
 with open(WORDS_PATH, "r", encoding="utf-8") as f:
     ALL_WORDS: Set[str] = set(json.load(f))
@@ -51,7 +55,42 @@ class Player:
         return html.escape(self.first_name)
 
 
+def letters_match(word: str, required_letters: str) -> bool:
+    w = word.lower()
+    req = required_letters.lower()
+    return all(w.count(char) >= req.count(char) for char in set(req))
+
+
 class BombGame:
+    @staticmethod
+    def is_valid_word(word: str) -> bool:
+        if not word:
+            return False
+        w = word.lower().strip()
+        if w in ALL_WORDS:
+            return True
+        # Adverbs from adjectives (-о / -е -> -ий, -ій)
+        if w.endswith('о') or w.endswith('е'):
+            if (w[:-1] + 'ий') in ALL_WORDS or (w[:-1] + 'ій') in ALL_WORDS:
+                return True
+        # Feminine accusative (-у / -ю -> -а / -я)
+        if w.endswith('у') and (w[:-1] + 'а') in ALL_WORDS:
+            return True
+        if w.endswith('ю') and (w[:-1] + 'я') in ALL_WORDS:
+            return True
+        # Instrumental (-ом / -ем)
+        if (w.endswith('ом') or w.endswith('ем')) and w[:-2] in ALL_WORDS:
+            return True
+        # Plural / Genitive (-и / -і)
+        if w.endswith('и') and ((w[:-1] + 'а') in ALL_WORDS or w[:-1] in ALL_WORDS):
+            return True
+        if w.endswith('і') and ((w[:-1] + 'а') in ALL_WORDS or (w[:-1] + 'я') in ALL_WORDS or w[:-1] in ALL_WORDS):
+            return True
+        # Masculine genitive / accusative (-а / -у)
+        if len(w) >= 4 and (w.endswith('а') or w.endswith('у')) and w[:-1] in ALL_WORDS:
+            return True
+        return False
+
     def __init__(self, chat_id: int, creator: Player, bet: int = 0, turn_seconds: int = BOMB_TURN_SECONDS):
         self.chat_id = chat_id
         self.creator_id = creator.user_id
@@ -101,9 +140,9 @@ class BombGame:
         self.paid_ids.clear()
 
     def get_lobby_markup(self) -> InlineKeyboardMarkup:
-        s8 = "⚡ 8с " + ("✅" if self.base_turn_seconds == 8 else "")
-        s12 = "⏱️ 12с " + ("✅" if self.base_turn_seconds == 12 else "")
-        s18 = "🐢 18с " + ("✅" if self.base_turn_seconds == 18 else "")
+        s12 = "⚡ 12с " + ("✅" if self.base_turn_seconds == 12 else "")
+        s45 = "⏱️ 45с " + ("✅" if self.base_turn_seconds == 45 else "")
+        s60 = "⏳ 60с " + ("✅" if self.base_turn_seconds == 60 else "")
 
         buttons = [
             [
@@ -111,9 +150,9 @@ class BombGame:
                 InlineKeyboardButton(text="➖ Покинути", callback_data="bomb_leave")
             ],
             [
-                InlineKeyboardButton(text=s8, callback_data="bomb_speed_8"),
                 InlineKeyboardButton(text=s12, callback_data="bomb_speed_12"),
-                InlineKeyboardButton(text=s18, callback_data="bomb_speed_18"),
+                InlineKeyboardButton(text=s45, callback_data="bomb_speed_45"),
+                InlineKeyboardButton(text=s60, callback_data="bomb_speed_60"),
             ],
             [
                 InlineKeyboardButton(text="⚡ Розпочати бій", callback_data="bomb_start_now")
@@ -139,12 +178,11 @@ class BombGame:
     def pick_new_syllable(self) -> str:
         shuffled = random.sample(ALL_SYLLABLES, min(100, len(ALL_SYLLABLES)))
         for syl in shuffled:
-            syl_low = syl.lower()
             count = 0
             for w in ALL_WORDS:
-                if syl_low in w and w not in self.used_words:
+                if letters_match(w, syl) and w not in self.used_words:
                     count += 1
-                    if count >= 3:
+                    if count >= 5:
                         return syl
         return random.choice(ALL_SYLLABLES)
 
@@ -313,12 +351,14 @@ class BombGame:
         heat_idx = min(len(heat_levels) - 1, max(0, 4 - self.core_turns_left))
         heat_status = heat_levels[heat_idx]
 
+        solo_info = f"🎯 Раунд: <b>{getattr(self, 'solo_rounds', 0) + 1}/5</b>\n" if len(self.players) == 1 else ""
         turn_text = (
             f"🔥 <b>СЕРЦЕ ДРАКОНА В РУКАХ {curr.display_name}!</b> 🔥\n\n"
-            f"Склад: <b>[ {self.current_syllable.upper()} ]</b>\n"
+            f"{solo_info}"
+            f"Літери: <b>[ {self.current_syllable.upper()} ]</b> <i>(у будь-яких позиціях слова)</i>\n"
             f"🌋 Стан полум'я: {heat_status}\n"
             f"⏳ Таймер: <b>{self.turn_seconds} секунд</b>\n\n"
-            f"✍️ Напиши в чат українське слово з цим складом!"
+            f"✍️ Напиши в чат слово, яке містить літери <b>{self.current_syllable.upper()}</b>!"
         )
 
         try:
@@ -363,21 +403,21 @@ class BombGame:
             word_no_apostrophe = clean_word.replace("'", "")
             syl_no_apostrophe = syllable_clean.replace("'", "")
 
-            # Validate syllable presence
-            if syllable_clean not in clean_word and syl_no_apostrophe not in word_no_apostrophe:
+            # Validate letters presence (any position in word)
+            if not letters_match(clean_word, self.current_syllable) and not letters_match(word_no_apostrophe, syl_no_apostrophe):
                 curr.strikes += 1
                 if curr.strikes >= 3:
-                    await self._eliminate_player(bot, reason=f"3 хибні спроби поспіль (немає складу '{self.current_syllable.upper()}').")
+                    await self._eliminate_player(bot, reason=f"3 помилкові спроби поспіль (слово не містить усіх літер: {self.current_syllable.upper()}).")
                 else:
                     await bot.send_message(
                         self.chat_id,
-                        f"❌ {curr.display_name}, у слові немає складу <b>[{self.current_syllable.upper()}]</b>! (Спроба {curr.strikes}/3)",
+                        f"❌ {curr.display_name}, слово має містити літери <b>[{self.current_syllable.upper()}]</b> у будь-яких позиціях! (Спроба {curr.strikes}/3)",
                         parse_mode="HTML"
                     )
                 return True
 
-            # Validate word existence in Ukrainian dictionary (check both forms)
-            if clean_word not in ALL_WORDS and word_no_apostrophe not in ALL_WORDS:
+            # Validate word existence in Ukrainian dictionary (check both forms + forms/adverbs)
+            if not self.is_valid_word(clean_word) and not self.is_valid_word(word_no_apostrophe):
                 curr.strikes += 1
                 if curr.strikes >= 3:
                     await self._eliminate_player(bot, reason="3 слова поспіль не знайдено у сувої Дракона.")
@@ -402,14 +442,21 @@ class BombGame:
             self.used_words.add(word_no_apostrophe)
             self.core_turns_left -= 1
 
-            # Check for hidden critical core overheat
-            if self.core_turns_left <= 0:
+            # Solo mode vs Dragon: 5 rounds to win and claim rewards!
+            if len(self.players) == 1:
+                self.solo_rounds = getattr(self, "solo_rounds", 0) + 1
+                if self.solo_rounds >= 5:
+                    await self._finish_solo_victory(curr, bot)
+                    return True
+
                 await bot.send_message(
                     self.chat_id,
-                    f"✅ Слово «{html.escape(clean_word)}» прийнято, АЛЕ...",
-                    parse_mode="HTML"
+                    f"✅ {curr.display_name} виголосив «{html.escape(clean_word)}»! (Раунд {self.solo_rounds}/5)\n"
+                    f"🔥 Полум'я Дракона приборкується! Назви ще {5 - self.solo_rounds} слів для тріумфу!"
                 )
-                await self._eliminate_player(bot, reason="Полум'я Дракона вийшло з-під контролю і спалахнуло в руках!")
+                self.turn_seconds = self.base_turn_seconds
+                self.current_syllable = self.pick_new_syllable()
+                await self._start_turn(bot)
                 return True
 
             # Advance to next player
@@ -424,6 +471,46 @@ class BombGame:
             )
             await self._start_turn(bot)
             return True
+
+
+    async def _finish_solo_victory(self, winner: Player, bot: Bot):
+        self.state = "FINISHED"
+        active_bomb_games.pop(self.chat_id, None)
+        curr_task = asyncio.current_task()
+        if self.timer_task and self.timer_task is not curr_task and not self.timer_task.done():
+            self.timer_task.cancel()
+
+        prize = self.total_pot if self.total_pot > 0 else random.randint(15, 25)
+        food = 0
+        egg = 0
+        try:
+            res = await database.award_game_win(winner.user_id, coins=prize, username=winner.username, first_name=winner.first_name)
+            food = res.get("food", 0)
+            egg = res.get("egg", 0)
+        except Exception as e:
+            logger.error(f"Failed to award bomb solo win in db: {e}")
+
+        victory_text = (
+            f"👑 <b>ТРИУМФ У ГРІ «БОМБА» (СОЛО-БІЙ З ДРАКОНОМ)!</b> 👑\n\n"
+            f"🎉 Вітаємо володаря слів {winner.display_name}!\n"
+            f"Ти успішно приборкав Полум'я Дракона і витримав 5 раундів підряд!\n\n"
+            f"🏆 Нагорода: <b>+{prize} 🪙 Монет</b> зачислено у твій інвентар!\n"
+        )
+        if food > 0:
+            victory_text += "🍖 <b>+1 Смаколик</b> (випав з шансом 20%)!\n"
+        if egg > 0:
+            victory_text += (
+                "🥚 <b>ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!</b>\n"
+                "Запустіть <code>/roulette</code> або <code>!рулетка</code>, щоб висидіти нового дракона!\n"
+            )
+        victory_text += "\n🐉 Відкрити Лігво: <code>/lair</code> або <code>!моєлігво</code>"
+        try:
+            await bot.send_message(self.chat_id, victory_text, parse_mode="HTML")
+        except Exception:
+            try:
+                await bot.send_message(self.chat_id, victory_text)
+            except Exception:
+                pass
 
     async def use_freeze(self, user_id: int, bot: Bot) -> tuple[bool, str]:
         async with self.lock:

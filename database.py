@@ -24,9 +24,14 @@ def _init_db_sync():
                 dragon_xp TEXT DEFAULT '{"fire":0,"storm":0,"frost":0,"jade":0}',
                 last_train INTEGER DEFAULT 0,
                 last_expedition INTEGER DEFAULT 0,
+                has_started INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN has_started INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 async def init_db():

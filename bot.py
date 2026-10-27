@@ -27,11 +27,14 @@ dp.include_router(bomb_router)
 dp.include_router(hunt_router)
 dp.include_router(cities_router)
 
-def get_main_keyboard(is_group: bool = False, user_id: int = None):
+def get_main_keyboard(is_group: bool = False, user_id: int = None, has_started: bool = True):
     # Telegram strictly forbids 'web_app' inline buttons in groups!
-    # In groups we send standard url= link, in private chat we send web_app=
+    # In groups we send standard url= link with startapp parameter, in private chat we send web_app=
     if is_group:
-        lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=TG_APP_URL)
+        if has_started and user_id:
+            lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url=f"https://t.me/MyDragonLair_bot/app?startapp=user_{user_id}")
+        else:
+            lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url="https://t.me/MyDragonLair_bot?start=lair")
     else:
         url = f"{WEBAPP_URL}?user_id={user_id}" if user_id else WEBAPP_URL
         lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=url))
@@ -90,11 +93,9 @@ async def cmd_myid(message: types.Message):
     try:
         uid = message.from_user.id if message.from_user else message.chat.id
         await message.answer(
-            f"🆔 **Ваш числовий Telegram ID:** `{uid}`\n\n"
-            f"💡 *(Натисніть на число вище, щоб скопіювати)*\n\n"
-            f"Введіть цей ID в Адмін-панелі веб-додатку (кнопка ⚙️ вгорі ➔ поле «Прив'язка Telegram ID» ➔ «💾 Зберегти ID»).\n"
-            f"Після цього всі накручені яйця 🥚, монети 🪙 та відкриті дракони миттєво підтягнуться до бота!",
-            parse_mode="Markdown"
+            f"🆔 <b>Ваш числовий Telegram ID:</b> <code>{uid}</code>\n"
+            f"<i>(натисніть для копіювання)</i>",
+            parse_mode="HTML"
         )
     except Exception as e:
         print("cmd_myid error:", e)
@@ -154,7 +155,18 @@ async def cmd_start(message: types.Message):
         )
 
         is_group = message.chat.type in ["group", "supergroup"]
-        await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
+        if not is_group:
+            await update_user(uid, has_started=1)
+            # Check deep link start args
+            text_parts = message.text.split() if message.text else []
+            if len(text_parts) > 1:
+                arg = text_parts[1].lower()
+                if arg == "roulette":
+                    await cmd_roulette(message)
+                    return
+
+        has_started = bool(user.get('has_started', 0)) if is_group else True
+        await message.answer(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid, has_started=has_started))
     except Exception as e:
         print("cmd_start error:", e)
 
@@ -170,26 +182,21 @@ async def cmd_lair(message: types.Message):
         fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
 
         user = await get_or_create_user(uid, uname, fname)
-        unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
         is_group = message.chat.type in ["group", "supergroup"]
 
-        if not unlocked:
-            await message.answer(
-                "🏰 **Ваше Лігво ще спить і порожнє!** 🥚\n\n"
-                "У вас ще немає жодного дракона чи магічного яйця.\n"
-                "Зіграйте в `/bomb` або `/movie`, вибийте яйце та запустіть `/roulette`!",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard(is_group=is_group, user_id=uid)
-            )
-            return
-
         if is_group:
-            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=TG_APP_URL)
+            if user.get('has_started', 0) == 1:
+                lair_url = f"https://t.me/MyDragonLair_bot/app?startapp=user_{uid}"
+                open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=lair_url)
+            else:
+                lair_url = "https://t.me/MyDragonLair_bot?start=lair"
+                open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=lair_url)
         else:
             open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
 
         await message.answer(
-            "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити світ драконів:",
+            "🏰 **Вхід до вашого гнізда драконів:**\nНатисніть кнопку нижче, щоб відкрити 3D світ драконів:",
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[open_btn]])
         )
     except Exception as e:
@@ -204,66 +211,39 @@ async def cmd_roulette(message: types.Message, user_override: types.User = None)
     try:
         user_obj = user_override or message.from_user
         uid = user_obj.id if user_obj else message.chat.id
-        uname = (message.from_user.username or "") if message.from_user else ""
-        fname = (message.from_user.first_name or "Володар") if message.from_user else "Володар"
+        uname = (user_obj.username or "") if user_obj else ""
+        fname = (user_obj.first_name or "Володар") if user_obj else "Володар"
 
         user = await get_or_create_user(uid, uname, fname)
         is_group = message.chat.type in ["group", "supergroup"]
 
         if user['eggs'] < 1:
             await message.answer(
-                f"❌ **У вас немає яєць для рулетки!** (Потрібно 1 🥚)\n\n"
-                f"🆔 **Ваш Telegram ID:** `{uid}`\n\n"
-                f"💡 **Як отримати яйце:**\n"
-                f"• Грайте в `/bomb`, `/movie` або `/cities` (10% шанс вибити драконяче яйце у кожній грі)!\n"
-                f"• Накрутіть яйця в Адмін-панелі гри (шестірня ⚙️), вказавши свій ID: `{uid}`!",
-                parse_mode="Markdown",
-                reply_markup=get_main_keyboard(is_group=is_group, user_id=uid)
+                "❌ **У вас немає драконячих яєць!** (Потрібно 1 🥚)\n\n"
+                "💡 **Як отримати яйце:**\n"
+                "• Перемагайте в іграх `/bomb`, `/movie` або `/cities` (10% шанс вибити драконяче яйце у кожній грі)!",
+                parse_mode="Markdown"
             )
             return
 
-        await update_user(user['user_id'], eggs=user['eggs'] - 1)
-
-        elements = ['fire', 'storm', 'frost', 'jade']
-        elem_names = {
-            'fire': "🔥 Вогняного Дракона (Typhoomerang)",
-            'storm': "⚡ Штормового Дракона (Flightmare)",
-            'frost': "❄️ Крижаного Дракона (Dreamdragon)",
-            'jade': "🎋 Нефритового Дракона (Singetail)"
-        }
-
-        won_elem = random.choice(elements)
-        unlocked = json.loads(user['unlocked_elements']) if user.get('unlocked_elements') else []
-        levels = json.loads(user['dragon_levels']) if user.get('dragon_levels') else {}
-
-        is_duplicate = won_elem in unlocked
-
-        if is_duplicate:
-            await update_user(user['user_id'], food=user['food'] + 5)
-            text = (
-                f"🎰 **Рулетка прокручена!** (-1 🥚)\n\n"
-                f"✨ Випала стихія: **{elem_names[won_elem]}**!\n"
-                f"ℹ️ У вас вже є цей дракон. Компенсація: **+5 🍖 смаколиків**!"
-            )
+        # Player has eggs >= 1! Launch Roulette in Mini App!
+        if is_group:
+            if user.get('has_started', 0) == 1:
+                roulette_url = f"https://t.me/MyDragonLair_bot/app?startapp=roulette_{uid}"
+                btn = InlineKeyboardButton(text="🎰 Відкрити Рулетку в Лігві", url=roulette_url)
+            else:
+                roulette_url = "https://t.me/MyDragonLair_bot?start=roulette"
+                btn = InlineKeyboardButton(text="🎰 Відкрити Рулетку в Лігві", url=roulette_url)
         else:
-            unlocked.append(won_elem)
-            if not user.get('active_element'):
-                await update_user(user['user_id'], active_element=won_elem)
-            if won_elem not in levels:
-                levels[won_elem] = 1
-            await update_user(
-                user['user_id'],
-                unlocked_elements=json.dumps(unlocked),
-                dragon_levels=json.dumps(levels)
-            )
-            text = (
-                f"🎰 **РУЛЕТКА ПРОКРУЧЕНА!** (-1 🥚)\n\n"
-                f"🎉 **НЕЙМОВІРНО! ВИ ВІДКРИЛИ НОВОГО ДРАКОНА!**\n"
-                f"🐉 Стихія: **{elem_names[won_elem]}**\n\n"
-                f"Тепер він доступний у вашому лігві! Перейдіть у меню та познайомтеся зі своїм новим улюбленцем."
-            )
+            roulette_url = f"{WEBAPP_URL}?open=roulette&user_id={uid}"
+            btn = InlineKeyboardButton(text="🎰 Відкрити Рулетку в Лігві", web_app=WebAppInfo(url=roulette_url))
 
-        await message.answer(text, parse_mode="Markdown", reply_markup=get_main_keyboard(is_group=is_group, user_id=uid))
+        await message.answer(
+            "🎰 **Рулетка 4 Стихій Дракона готова до запуску!**\n"
+            "Використайте 1 🥚, щоб випробувати удачу та вибити дракона у 3D!",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[btn]])
+        )
     except Exception as e:
         print("cmd_roulette error:", e)
 
@@ -356,5 +336,3 @@ async def cb_roulette(query: types.CallbackQuery):
 async def cb_profile(query: types.CallbackQuery):
     await query.answer()
     await cmd_profile(query.message, user_override=query.from_user)
-
-

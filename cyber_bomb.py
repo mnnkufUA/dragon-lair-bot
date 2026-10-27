@@ -55,6 +55,12 @@ class Player:
         return html.escape(self.first_name)
 
 
+def letters_match(word: str, required_letters: str) -> bool:
+    w = word.lower()
+    req = required_letters.lower()
+    return all(w.count(char) >= req.count(char) for char in set(req))
+
+
 class BombGame:
     @staticmethod
     def is_valid_word(word: str) -> bool:
@@ -134,9 +140,9 @@ class BombGame:
         self.paid_ids.clear()
 
     def get_lobby_markup(self) -> InlineKeyboardMarkup:
-        s8 = "⚡ 8с " + ("✅" if self.base_turn_seconds == 8 else "")
-        s12 = "⏱️ 12с " + ("✅" if self.base_turn_seconds == 12 else "")
-        s18 = "🐢 18с " + ("✅" if self.base_turn_seconds == 18 else "")
+        s12 = "⚡ 12с " + ("✅" if self.base_turn_seconds == 12 else "")
+        s45 = "⏱️ 45с " + ("✅" if self.base_turn_seconds == 45 else "")
+        s60 = "⏳ 60с " + ("✅" if self.base_turn_seconds == 60 else "")
 
         buttons = [
             [
@@ -144,9 +150,9 @@ class BombGame:
                 InlineKeyboardButton(text="➖ Покинути", callback_data="bomb_leave")
             ],
             [
-                InlineKeyboardButton(text=s8, callback_data="bomb_speed_8"),
                 InlineKeyboardButton(text=s12, callback_data="bomb_speed_12"),
-                InlineKeyboardButton(text=s18, callback_data="bomb_speed_18"),
+                InlineKeyboardButton(text=s45, callback_data="bomb_speed_45"),
+                InlineKeyboardButton(text=s60, callback_data="bomb_speed_60"),
             ],
             [
                 InlineKeyboardButton(text="⚡ Розпочати бій", callback_data="bomb_start_now")
@@ -172,12 +178,11 @@ class BombGame:
     def pick_new_syllable(self) -> str:
         shuffled = random.sample(ALL_SYLLABLES, min(100, len(ALL_SYLLABLES)))
         for syl in shuffled:
-            syl_low = syl.lower()
             count = 0
             for w in ALL_WORDS:
-                if syl_low in w and w not in self.used_words:
+                if letters_match(w, syl) and w not in self.used_words:
                     count += 1
-                    if count >= 3:
+                    if count >= 5:
                         return syl
         return random.choice(ALL_SYLLABLES)
 
@@ -346,12 +351,14 @@ class BombGame:
         heat_idx = min(len(heat_levels) - 1, max(0, 4 - self.core_turns_left))
         heat_status = heat_levels[heat_idx]
 
+        solo_info = f"🎯 Раунд: <b>{getattr(self, 'solo_rounds', 0) + 1}/5</b>\n" if len(self.players) == 1 else ""
         turn_text = (
             f"🔥 <b>СЕРЦЕ ДРАКОНА В РУКАХ {curr.display_name}!</b> 🔥\n\n"
-            f"Склад: <b>[ {self.current_syllable.upper()} ]</b>\n"
+            f"{solo_info}"
+            f"Літери: <b>[ {self.current_syllable.upper()} ]</b> <i>(у будь-яких позиціях слова)</i>\n"
             f"🌋 Стан полум'я: {heat_status}\n"
             f"⏳ Таймер: <b>{self.turn_seconds} секунд</b>\n\n"
-            f"✍️ Напиши в чат українське слово з цим складом!"
+            f"✍️ Напиши в чат слово, яке містить літери <b>{self.current_syllable.upper()}</b>!"
         )
 
         try:
@@ -396,15 +403,15 @@ class BombGame:
             word_no_apostrophe = clean_word.replace("'", "")
             syl_no_apostrophe = syllable_clean.replace("'", "")
 
-            # Validate syllable presence
-            if syllable_clean not in clean_word and syl_no_apostrophe not in word_no_apostrophe:
+            # Validate letters presence (any position in word)
+            if not letters_match(clean_word, self.current_syllable) and not letters_match(word_no_apostrophe, syl_no_apostrophe):
                 curr.strikes += 1
                 if curr.strikes >= 3:
-                    await self._eliminate_player(bot, reason=f"3 хибні спроби поспіль (немає складу '{self.current_syllable.upper()}').")
+                    await self._eliminate_player(bot, reason=f"3 помилкові спроби поспіль (слово не містить усіх літер: {self.current_syllable.upper()}).")
                 else:
                     await bot.send_message(
                         self.chat_id,
-                        f"❌ {curr.display_name}, у слові немає складу <b>[{self.current_syllable.upper()}]</b>! (Спроба {curr.strikes}/3)",
+                        f"❌ {curr.display_name}, слово має містити літери <b>[{self.current_syllable.upper()}]</b> у будь-яких позиціях! (Спроба {curr.strikes}/3)",
                         parse_mode="HTML"
                     )
                 return True

@@ -4,7 +4,10 @@ from aiogram import Router, types, F
 from aiogram.filters import Command, Filter
 
 import database
-from games.cyber_bomb import BombGame, Player, active_bomb_games
+try:
+    from games.cyber_bomb import BombGame, Player, active_bomb_games
+except ImportError:
+    from cyber_bomb import BombGame, Player, active_bomb_games
 from games.cities_game import active_cities_games
 from games.pixel_hunt import active_hunt_games
 from config import BOMB_TURN_SECONDS

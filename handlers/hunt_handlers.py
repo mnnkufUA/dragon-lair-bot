@@ -3,7 +3,10 @@ import logging
 from aiogram import Router, types, F
 from aiogram.filters import Command, Filter
 
-from games.pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
+try:
+    from games.pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
+except ImportError:
+    from pixel_hunt import PixelHuntGame, active_hunt_games, pick_random_hunt_item
 from handlers.bomb_handlers import chat_has_game, _creating_chats
 
 logger = logging.getLogger(__name__)

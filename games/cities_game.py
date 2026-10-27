@@ -22,7 +22,11 @@ from config import (
 logger = logging.getLogger("DragonCities")
 
 CITIES_PATH = BASE_DIR / "data" / "cities.json"
+if not CITIES_PATH.exists():
+    CITIES_PATH = BASE_DIR / "cities.json"
 BLACKLIST_PATH = BASE_DIR / "data" / "cities_blacklist.json"
+if not BLACKLIST_PATH.exists():
+    BLACKLIST_PATH = BASE_DIR / "cities_blacklist.json"
 
 with open(CITIES_PATH, "r", encoding="utf-8") as f:
     ALL_CITIES: Dict[str, str] = json.load(f)
@@ -35,7 +39,7 @@ if BLACKLIST_PATH.exists():
 # Global registry of active cities games: chat_id -> CitiesGame
 active_cities_games: Dict[int, "CitiesGame"] = {}
 
-INVALID_ENDINGS = set("ьъи'’` -")
+INVALID_ENDINGS = set("ьъий'’` -")
 
 
 def get_valid_last_letter(city_name: str) -> str:
@@ -135,14 +139,19 @@ class CitiesGame:
         return [p for p in self.players if p.team == "blue"]
 
     def get_lobby_markup(self) -> InlineKeyboardMarkup:
-        s10 = "⚡ 10с " + ("✅" if self.base_turn_seconds == 10 else "")
-        s15 = "⏱️ 15с " + ("✅" if self.base_turn_seconds == 15 else "")
-        s25 = "🐢 25с " + ("✅" if self.base_turn_seconds == 25 else "")
+        s20 = "⚡ 20с " + ("✅" if self.base_turn_seconds == 20 else "")
+        s45 = "⏱️ 45с " + ("✅" if self.base_turn_seconds == 45 else "")
+        s60 = "⏳ 60с " + ("✅" if self.base_turn_seconds == 60 else "")
 
         buttons = [
             [
                 InlineKeyboardButton(text="➕ Приєднатися", callback_data="cities_join"),
                 InlineKeyboardButton(text="➖ Покинути", callback_data="cities_leave")
+            ],
+            [
+                InlineKeyboardButton(text=s20, callback_data="cities_speed_20"),
+                InlineKeyboardButton(text=s45, callback_data="cities_speed_45"),
+                InlineKeyboardButton(text=s60, callback_data="cities_speed_60"),
             ]
         ]
 
@@ -534,7 +543,7 @@ class CitiesGame:
             if matched_key in self.used_cities:
                 await bot.send_message(
                     self.chat_id,
-                    f"⚠️ Місто «{html.escape(ALL_CITIES[matched_key])}» вже називали у цій подорожі! Придумай інше місто на <b>[{self.current_letter.upper()}]</b>.",
+                    f"⚠️ Місто <b>{html.escape(ALL_CITIES[matched_key])}</b> вже було названо в цій грі! Назвіть інше місто на букву <b>[{self.current_letter.upper()}]</b>.",
                     parse_mode="HTML"
                 )
                 return True
@@ -614,8 +623,13 @@ class CitiesGame:
             self.timer_task.cancel()
 
         prize = random.randint(15, 25)
+        food = 0
+        egg = 0
         try:
-            await database.record_cities_win(player.user_id, prize)
+            res = await database.record_cities_win(player.user_id, prize)
+            if isinstance(res, dict):
+                food = res.get("food", 0)
+                egg = res.get("egg", 0)
         except Exception as e:
             logger.error(f"Error recording cities win: {e}")
 
@@ -623,8 +637,15 @@ class CitiesGame:
             f"👑 <b>ТРИУМФ У СОЛО-ПОДОРОЖІ З ДРАКОНОМ!</b> 👑\n\n"
             f"🏆 {player.plain_name} переміг стародавнього Дракона у знанні географії!\n"
             f"💰 Винагорода: <b>+{prize} 🪙 Монет</b>\n"
-            f"🎉 Справжній картограф та майстер міст!"
         )
+        if food > 0:
+            win_text += "🍖 <b>+1 Смаколик</b> (випав з шансом 20%)!\n"
+        if egg > 0:
+            win_text += (
+                "🥚 <b>ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!</b>\n"
+                "Запустіть <code>/roulette</code> або <code>!рулетка</code>, щоб висидіти нового дракона!\n"
+            )
+        win_text += "\n🐉 Відкрити Лігво: <code>/lair</code> або <code>!моєлігво</code>"
         await bot.send_message(self.chat_id, win_text, parse_mode="HTML")
 
     async def use_compass(self, user_id: int, bot: Bot) -> tuple[bool, str]:
@@ -755,8 +776,13 @@ class CitiesGame:
                 winner = self.players[0]
                 prize = self.total_pot if self.total_pot > 0 else random.randint(15, 25)
 
+                food = 0
+                egg = 0
                 try:
-                    await database.record_cities_win(winner.user_id, prize)
+                    res = await database.record_cities_win(winner.user_id, prize)
+                    if isinstance(res, dict):
+                        food = res.get("food", 0)
+                        egg = res.get("egg", 0)
                 except Exception as e:
                     logger.error(f"Error in cities win record: {e}")
 
@@ -764,8 +790,15 @@ class CitiesGame:
                     f"👑 <b>ПЕРЕМОГА У «МІСТАХ ДРАКОНА»!</b> 👑\n\n"
                     f"🏆 Мандрівник {winner.plain_name} став єдиним знавцем мапи!\n"
                     f"💰 Винагорода: <b>+{prize} 🪙 Монет</b>\n"
-                    f"🎉 Браво володарю географічних таємниць!"
                 )
+                if food > 0:
+                    win_text += "🍖 <b>+1 Смаколик</b> (випав з шансом 20%)!\n"
+                if egg > 0:
+                    win_text += (
+                        "🥚 <b>ВАМ ВИПАЛО ДРАКОНЯЧЕ ЯЙЦЕ (10% шанс)!</b>\n"
+                        "Запустіть <code>/roulette</code> або <code>!рулетка</code>, щоб висидіти нового дракона!\n"
+                    )
+                win_text += "\n🐉 Відкрити Лігво: <code>/lair</code> або <code>!моєлігво</code>"
                 try:
                     await bot.send_message(self.chat_id, win_text, parse_mode="HTML")
                 except Exception:
