@@ -14464,9 +14464,10 @@
     // ==========================================
     window.autoOpenRoulette = false;
 
-    const API_BASE = (window.location && window.location.origin && (window.location.origin.includes('pages.dev') || window.location.origin.includes('github.io') || window.location.origin.includes('vercel.app')))
+    const _apiParam = new URLSearchParams(window.location.search).get('api') || new URLSearchParams(window.location.hash.replace(/^#/, '')).get('api');
+    const API_BASE = _apiParam || ((window.location && window.location.origin && (window.location.origin.includes('pages.dev') || window.location.origin.includes('github.io') || window.location.origin.includes('vercel.app')))
       ? 'https://dragon-lair-bot.onrender.com'
-      : '';
+      : '');
 
     function resolveTelegramUserId() {
       // 1. URL search or hash parameters (Bot explicitly passes ?user_id=...)
