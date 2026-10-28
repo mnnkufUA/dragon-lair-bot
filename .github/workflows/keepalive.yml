@@ -1,0 +1,16 @@
+name: Render 24/7 Keep-Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes to prevent Render free instance from sleeping
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend Health Endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://dragon-lair-bot.onrender.com/health)
+          echo "Render /health returned HTTP $response"

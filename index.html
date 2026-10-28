@@ -8600,22 +8600,22 @@
       <!-- CURRENCIES & INVENTORY DISPLAY (0 BY DEFAULT) -->
       <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Монети 🪙">
         <span class="text-xs">🪙</span>
-        <span id="sparksBalanceDisplay" class="text-xs font-bold text-amber-300 font-mono tracking-wide">0</span>
+        <span id="sparksBalanceDisplay" class="text-xs font-bold text-amber-300 font-mono tracking-wide">10 000</span>
       </div>
 
       <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Сльози Дракона 💧">
         <span class="text-xs">💧</span>
-        <span id="tearsBalanceDisplay" class="text-xs font-bold text-cyan-300 font-mono tracking-wide">0</span>
+        <span id="tearsBalanceDisplay" class="text-xs font-bold text-cyan-300 font-mono tracking-wide">100</span>
       </div>
 
       <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Смаколики 🍖">
         <span class="text-xs">🍖</span>
-        <span id="foodBalanceDisplay" class="text-xs font-bold text-emerald-300 font-mono tracking-wide">0</span>
+        <span id="foodBalanceDisplay" class="text-xs font-bold text-emerald-300 font-mono tracking-wide">50</span>
       </div>
 
       <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 px-2 py-1 rounded-full shadow-inner" title="Яйця Дракона 🥚">
         <span class="text-xs">🥚</span>
-        <span id="eggBalanceDisplay" class="text-xs font-bold text-purple-300 font-mono tracking-wide">0</span>
+        <span id="eggBalanceDisplay" class="text-xs font-bold text-purple-300 font-mono tracking-wide">60</span>
       </div>
     </div>
   </header>
@@ -14459,6 +14459,10 @@
     // ==========================================
     window.autoOpenRoulette = false;
 
+    const API_BASE = (window.location && window.location.origin && window.location.origin.includes('onrender.com'))
+      ? ''
+      : 'https://dragon-lair-bot.onrender.com';
+
     function resolveTelegramUserId() {
       // 1. URL search or hash parameters (Bot explicitly passes ?user_id=...)
       try {
@@ -14574,7 +14578,7 @@
       }
       try {
         console.log(`📡 [loadCloudUserState] Fetching data for user ${window.tgUserId}...`);
-        const res = await fetch(`/api/user?user_id=${window.tgUserId}`);
+        const res = await fetch(`${API_BASE}/api/user?user_id=${window.tgUserId}`);
         if (!res.ok) {
           console.warn(`⚠️ [loadCloudUserState] Server returned ${res.status}`);
           return;
@@ -14687,7 +14691,7 @@
         dragon_xp: dragonXP
       };
       try {
-        fetch('/api/sync', {
+        fetch(`${API_BASE}/api/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -15051,7 +15055,7 @@
 
       if (uid) {
         try {
-          await fetch('/api/reset', {
+          await fetch(`${API_BASE}/api/reset`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_id: uid })
@@ -15079,7 +15083,12 @@
 
     // Call checkEmptyLairState on window load
     window.addEventListener('DOMContentLoaded', () => {
+      updateCurrencyUI();
       checkEmptyLairState();
+      updateStageVisual();
+      if (typeof updateElementButtonsUI === 'function') updateElementButtonsUI();
+      loadCloudUserState();
+
       // Auto-poll cloud state every 3 seconds so the window updates in real-time even if left open!
       setInterval(() => {
         if (window.tgUserId && !isRouletteSpinning) {
