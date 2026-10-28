@@ -1,3 +1,13 @@
+---
+title: Dragon Lair Bot
+emoji: 🐉
+colorFrom: red
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🐉 Telegram Dragon Lair Bot & 3D Mini App (24/7 Free Hosting)
 
 Повний готовий пакет для безкоштовного запуску Telegram-бота та 3D WebApp у хмарі 24/7.
