@@ -13,6 +13,7 @@ except ImportError:
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://dragon-lair-bot.onrender.com").strip()
 TG_APP_URL = os.getenv("TG_APP_URL", "https://t.me/MyDragonLair_bot/app").strip()
+APP_VERSION = os.getenv("APP_VERSION", "1.0.2").strip()
 
 # Bomb game settings
 BOMB_TURN_SECONDS = 12

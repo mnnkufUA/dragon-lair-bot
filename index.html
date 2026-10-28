@@ -8920,10 +8920,10 @@
     }
 
     // Currencies & Inventory restored immediately from localStorage cache
-    let sparksBalance = parseInt(safeGetStorage('sparks_balance', 10000), 10) || 10000;
-    let dragonTearsBalance = parseInt(safeGetStorage('dragon_tears_balance', 100), 10) || 100;
-    let foodCount = parseInt(safeGetStorage('food_count', 50), 10) || 50;
-    let eggsInventory = parseInt(safeGetStorage('eggs_inventory', 60), 10) || 60;
+    let sparksBalance = Math.max(parseInt(safeGetStorage('sparks_balance', 10000), 10) || 0, 10000);
+    let dragonTearsBalance = Math.max(parseInt(safeGetStorage('dragon_tears_balance', 100), 10) || 0, 100);
+    let foodCount = Math.max(parseInt(safeGetStorage('food_count', 50), 10) || 0, 50);
+    let eggsInventory = Math.max(parseInt(safeGetStorage('eggs_inventory', 60), 10) || 0, 60);
 
     const DEFAULT_DRAGON_NAMES = {
       'fire': 'Вогонько',
@@ -8984,9 +8984,14 @@
       const savedUnlocked = safeGetStorage('unlocked_elements');
       if (savedUnlocked) {
         const parsed = JSON.parse(savedUnlocked);
-        if (Array.isArray(parsed) && parsed.length > 0) unlockedElements = parsed;
+        if (Array.isArray(parsed) && parsed.length >= 4) unlockedElements = parsed;
       }
     } catch (e) {}
+
+    // Ensure all 4 dragons are always unlocked
+    if (!Array.isArray(unlockedElements) || unlockedElements.length < 4) {
+      unlockedElements = ['fire', 'storm', 'frost', 'jade'];
+    }
 
     // Independent Dragon Levels & XP System (each dragon grows separately!)
     let dragonLevels = { 'fire': 15, 'storm': 15, 'frost': 15, 'jade': 15 };
@@ -14459,9 +14464,9 @@
     // ==========================================
     window.autoOpenRoulette = false;
 
-    const API_BASE = (window.location && window.location.origin && window.location.origin.includes('onrender.com'))
-      ? ''
-      : 'https://dragon-lair-bot.onrender.com';
+    const API_BASE = (window.location && window.location.origin && (window.location.origin.includes('pages.dev') || window.location.origin.includes('github.io') || window.location.origin.includes('vercel.app')))
+      ? 'https://dragon-lair-bot.onrender.com'
+      : '';
 
     function resolveTelegramUserId() {
       // 1. URL search or hash parameters (Bot explicitly passes ?user_id=...)

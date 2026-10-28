@@ -6,7 +6,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand, MenuButtonWebApp
 from database import get_or_create_user, update_user, add_game_rewards, reset_user
 
-from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL
+from config import BOT_TOKEN, WEBAPP_URL, TG_APP_URL, APP_VERSION
 try:
     from handlers.bomb_handlers import router as bomb_router, cmd_bomb
 except ImportError:
@@ -36,7 +36,7 @@ def get_main_keyboard(is_group: bool = False, user_id: int = None, has_started: 
         else:
             lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", url="https://t.me/MyDragonLair_bot?start=lair")
     else:
-        url = f"{WEBAPP_URL}?user_id={user_id}" if user_id else WEBAPP_URL
+        url = f"{WEBAPP_URL}?v={APP_VERSION}&user_id={user_id}" if user_id else f"{WEBAPP_URL}?v={APP_VERSION}"
         lair_btn = InlineKeyboardButton(text="🐉 Увійти в Лігво", web_app=WebAppInfo(url=url))
 
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -191,7 +191,7 @@ async def cmd_start(message: types.Message):
             try:
                 await message.bot.set_chat_menu_button(
                     chat_id=uid,
-                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?v={APP_VERSION}&user_id={uid}"))
                 )
             except Exception:
                 pass
@@ -230,11 +230,11 @@ async def cmd_lair(message: types.Message):
                 lair_url = "https://t.me/MyDragonLair_bot?start=lair"
                 open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", url=lair_url)
         else:
-            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+            open_btn = InlineKeyboardButton(text="🐉 Відкрити Лігво Дракона", web_app=WebAppInfo(url=f"{WEBAPP_URL}?v={APP_VERSION}&user_id={uid}"))
             try:
                 await message.bot.set_chat_menu_button(
                     chat_id=uid,
-                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?v={APP_VERSION}&user_id={uid}"))
                 )
             except Exception:
                 pass
@@ -280,7 +280,7 @@ async def cmd_roulette(message: types.Message, user_override: types.User = None)
                 roulette_url = "https://t.me/MyDragonLair_bot?start=roulette"
                 btn = InlineKeyboardButton(text="🎰 Відкрити Рулетку в Лігві", url=roulette_url)
         else:
-            roulette_url = f"{WEBAPP_URL}?open=roulette&user_id={uid}"
+            roulette_url = f"{WEBAPP_URL}?open=roulette&v={APP_VERSION}&user_id={uid}"
             btn = InlineKeyboardButton(text="🎰 Відкрити Рулетку в Лігві", web_app=WebAppInfo(url=roulette_url))
 
         await message.answer(
@@ -345,7 +345,7 @@ async def cmd_profile(message: types.Message, user_override: types.User = None):
             try:
                 await message.bot.set_chat_menu_button(
                     chat_id=uid,
-                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?user_id={uid}"))
+                    menu_button=MenuButtonWebApp(text="🐉 Лігво", web_app=WebAppInfo(url=f"{WEBAPP_URL}?v={APP_VERSION}&user_id={uid}"))
                 )
             except Exception:
                 pass
