@@ -3,7 +3,7 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from aiogram import Bot
 from bot import dp, BOT_TOKEN, WEBAPP_URL, setup_bot_commands
@@ -59,12 +59,12 @@ async def add_anti_cache_headers(request: Request, call_next):
         response.headers["Expires"] = "0"
     return response
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/index.html", response_class=HTMLResponse)
-async def serve_webapp():
-    if os.path.exists(HTML_FILE_PATH):
-        return FileResponse(HTML_FILE_PATH, headers=ANTI_CACHE_HEADERS)
-    return HTMLResponse("<h1>Dragon Lair WebApp: index.html not found!</h1>", status_code=404)
+@app.get("/")
+@app.get("/index.html")
+async def serve_webapp(request: Request):
+    query = str(request.query_params)
+    target = f"https://dragon-lair-bot.vercel.app/?{query}" if query else "https://dragon-lair-bot.vercel.app/"
+    return RedirectResponse(url=target, status_code=307)
 
 @app.get("/health")
 async def health_check():

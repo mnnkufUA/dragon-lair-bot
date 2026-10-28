@@ -11,10 +11,11 @@ except ImportError:
     pass
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://dragon-lair-bot.vercel.app").strip()
+_raw_web = os.getenv("WEBAPP_URL", "").strip()
+WEBAPP_URL = _raw_web if ("vercel.app" in _raw_web) else "https://dragon-lair-bot.vercel.app"
 TG_APP_URL = os.getenv("TG_APP_URL", "https://t.me/MyDragonLair_bot/app").strip()
 APP_VERSION = os.getenv("APP_VERSION", "1.0.2").strip()
-BACKEND_URL = os.getenv("BACKEND_URL", "https://dragon-lair-bot.onrender.com").strip()
+BACKEND_URL = "https://dragon-lair-bot.onrender.com"
 
 # Bomb game settings
 BOMB_TURN_SECONDS = 12
